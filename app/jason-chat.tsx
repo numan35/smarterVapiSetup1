@@ -734,37 +734,67 @@ async function runTurn(conversation: Msg[], slots: SlotsState) {
   }
 }
 
-    async function handoffToVapi(slots: SlotsState) {
-    const d = slots.details ?? {};
+    
+async function handoffToVapi(slots: SlotsState) {
+  const d = slots.details ?? {};
 
-    if (!d.restaurantName || !d.partySize || !d.date || !d.timeWindowStart || !d.timeWindowEnd || !d.restaurantPhone) {
-      append([{ role: "assistant", content: "I don’t have all the reservation details yet." }]);
-      return;
-    }
-
-    const payload = {
-      targetPhone: d.restaurantPhone,
-      businessName: d.restaurantName,
-      customerName: "Customer", // or pull from logged-in user profile
-      partySize: d.partySize,
-      date: d.date,                          // ISO or natural date string
-      desiredWindowStart: d.timeWindowStart, // "19:00"
-      desiredWindowEnd: d.timeWindowEnd,     // "19:30"
-      notes: d.specialRequests ?? null,
-      source: "app",
-    };
-
-    try {
-      const res = await callNow(payload);
-      if (res?.ok && res?.callId) {
-        append([{ role: "assistant", content: `📞 Calling ${d.restaurantName} now… (Call ID: ${res.callId})` }]);
-      } else {
-        append([{ role: "assistant", content: `I couldn't start the call: ${res?.error ?? "unknown error"}` }]);
-      }
-    } catch (err: any) {
-      append([{ role: "assistant", content: `Call error: ${err?.message ?? String(err)}` }]);
-    }
+  // ✅ Check required fields before calling
+  if (
+    !d.restaurantName ||
+    !d.partySize ||
+    !d.date ||
+    !d.timeWindowStart ||
+    !d.timeWindowEnd ||
+    !d.restaurantPhone
+  ) {
+    append([
+      {
+        role: "assistant",
+        content: "I don’t have all the reservation details yet. Please provide restaurant name, date, time, party size, and phone number.",
+      },
+    ]);
+    return;
   }
+
+  // ✅ Build payload exactly matching backend schema
+  const payload = {
+    targetPhone: d.restaurantPhone,
+    businessName: d.restaurantName,
+    customerName: "Customer", // TODO: replace with logged-in user’s name if available
+    partySize: d.partySize,
+    date: d.date, // ISO or YYYY-MM-DD
+    desiredWindowStart: d.timeWindowStart, // "HH:mm"
+    desiredWindowEnd: d.timeWindowEnd,     // "HH:mm"
+    notes: d.specialRequests ?? null,
+    source: "app",
+  };
+
+  try {
+    const res = await callNow(payload);
+    if (res?.ok && res?.callId) {
+      append([
+        {
+          role: "assistant",
+          content: `📞 Calling ${d.restaurantName} now… (Call ID: ${res.callId})`,
+        },
+      ]);
+    } else {
+      append([
+        {
+          role: "assistant",
+          content: `I couldn't start the call: ${res?.error ?? "unknown error"}`,
+        },
+      ]);
+    }
+  } catch (err: any) {
+    append([
+      {
+        role: "assistant",
+        content: `Call error: ${err?.message ?? String(err)}`,
+      },
+    ]);
+  }
+}
 
 
 
