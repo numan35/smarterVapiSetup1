@@ -680,44 +680,17 @@ async function runTurn(conversation: Msg[], slots: SlotsState) {
           }
 
           // Compose notes/script for dialer
-          const notes =
-            `Restaurant reservation request: ` +
-            `${partySize} people on ${date} between ${tStart}–${tEnd} (${TZ})` +
-            (details.specialRequests ? `; Special requests: ${details.specialRequests}` : "") +
-            (details.userPhone ? `; User phone: ${details.userPhone}` : "");
+          
+          // ✅ Use new unified handoff
+          await handoffToVapi(slots);
 
-          const script =
-            `Hi, is this ${restaurantName}? I'm Jason calling on behalf of a customer. ` +
-            `I'd like to book a table for ${partySize} on ${date} between ${tStart} and ${tEnd}. ` +
-            (details.specialRequests ? `Special request: ${details.specialRequests}. ` : "") +
-            `If that time isn't available, please offer the closest alternatives within 60 minutes. ` +
-            `Once confirmed, please repeat the reservation details back.`;
-
-          // Dial
-
-          // Dial
-          try {
-            const res = await callNow({
-              targetName: restaurantName,
-              targetPhone,
-              // @ts-expect-error: extend CallNowInput to support placeId if desired
-              placeId: details.placeId,
-              notes,
-              script,
-              source: "jason",
-            });
-
-            if (res?.ok && res?.callId) {
-              append([{ role: "assistant", content: `Calling ${restaurantName} now… (Call ID: ${res.callId})` }]);
-              toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ queued: true, callId: res.callId }) });
-            } else {
-              append([{ role: "assistant", content: `I couldn't start the call: ${res?.error ?? "unknown error"}` }]);
-              toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ queued: false, error: res?.error ?? "call_failed" }) });
-            }
-          } catch (err: any) {
-            append([{ role: "assistant", content: `Call error: ${err?.message ?? String(err)}` }]);
-            toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ queued: false, error: String(err) }) });
-          }
+          // Report back to the protocol that we queued the call
+          toolResults.push({
+            role: "tool",
+            name,
+            tool_call_id: tc.id,
+            content: JSON.stringify({ queued: true })
+          });
 
           
         } else {
