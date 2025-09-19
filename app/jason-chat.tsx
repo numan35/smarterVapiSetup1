@@ -734,37 +734,40 @@ async function runTurn(conversation: Msg[], slots: SlotsState) {
   }
 }
 
-    
-async function handoffToVapi(slots: SlotsState) {
+  async function handoffToVapi(slots: SlotsState) {
   const d = slots.details ?? {};
 
-  // ✅ Check required fields before calling
-  if (
-    !d.restaurantName ||
-    !d.partySize ||
-    !d.date ||
-    !d.timeWindowStart ||
-    !d.timeWindowEnd ||
-    !d.restaurantPhone
-  ) {
-    append([
-      {
-        role: "assistant",
-        content: "I don’t have all the reservation details yet. Please provide restaurant name, date, time, party size, and phone number.",
-      },
-    ]);
+  // choose a destination number from either alias
+  const raw = (d.restaurantPhone || d.targetPhone || "").trim();
+
+  // normalize to E.164 using the same helper you already have
+  const normalized = raw
+    ? maybeExtractPhoneFromText(raw)    // returns +1XXXXXXXXXX for 10-digit US numbers
+    : undefined;
+
+  const isE164 = (p?: string) => !!p && /^\+\d{10,15}$/.test(p || "");
+
+  if (!isE164(normalized)) {
+    append([{ role: "assistant", content: "I don’t have a valid phone number for the restaurant. Could you share the number I should call?" }]);
     return;
   }
 
-  // ✅ Build payload exactly matching backend schema
+  // make sure the rest of the required details exist
+  if (!d.restaurantName || !d.partySize || !d.date || !d.timeWindowStart || !d.timeWindowEnd) {
+    append([{ role: "assistant", content: "I don’t have all the reservation details yet." }]);
+    return;
+  }
+
+  // ensure FULL ISO for timestamptz on the server
+  const dateOnly = d.date.includes("T") ? d.date.split("T")[0] : d.date;
   const payload = {
-    targetPhone: d.restaurantPhone,
+    targetPhone: normalized,               // ✅ clean E.164
     businessName: d.restaurantName,
-    customerName: "Customer", // TODO: replace with logged-in user’s name if available
+    customerName: "Customer",
     partySize: d.partySize,
-    date: d.date, // ISO or YYYY-MM-DD
-    desiredWindowStart: d.timeWindowStart, // "HH:mm"
-    desiredWindowEnd: d.timeWindowEnd,     // "HH:mm"
+    date: dateOnly,                        // YYYY-MM-DD
+    desiredWindowStart: `${dateOnly}T${d.timeWindowStart}:00`,
+    desiredWindowEnd:   `${dateOnly}T${d.timeWindowEnd}:00`,
     notes: d.specialRequests ?? null,
     source: "app",
   };
@@ -772,29 +775,18 @@ async function handoffToVapi(slots: SlotsState) {
   try {
     const res = await callNow(payload);
     if (res?.ok && res?.callId) {
-      append([
-        {
-          role: "assistant",
-          content: `📞 Calling ${d.restaurantName} now… (Call ID: ${res.callId})`,
-        },
-      ]);
+      append([{ role: "assistant", content: `📞 Calling ${d.restaurantName} now… (Call ID: ${res.callId})` }]);
     } else {
-      append([
-        {
-          role: "assistant",
-          content: `I couldn't start the call: ${res?.error ?? "unknown error"}`,
-        },
-      ]);
+      // show any details the server returned (helps with Vapi debugging next)
+      const msg = res?.error ?? "unknown error";
+      const extra = res?.details?.message ? ` — ${res.details.message}` : "";
+      append([{ role: "assistant", content: `I couldn't start the call: ${msg}${extra}` }]);
     }
   } catch (err: any) {
-    append([
-      {
-        role: "assistant",
-        content: `Call error: ${err?.message ?? String(err)}`,
-      },
-    ]);
+    append([{ role: "assistant", content: `Call error: ${err?.message ?? String(err)}` }]);
   }
 }
+  
 
 
 
