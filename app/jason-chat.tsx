@@ -694,6 +694,8 @@ async function runTurn(conversation: Msg[], slots: SlotsState) {
             `Once confirmed, please repeat the reservation details back.`;
 
           // Dial
+
+          // Dial
           try {
             const res = await callNow({
               targetName: restaurantName,
@@ -716,6 +718,8 @@ async function runTurn(conversation: Msg[], slots: SlotsState) {
             append([{ role: "assistant", content: `Call error: ${err?.message ?? String(err)}` }]);
             toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ queued: false, error: String(err) }) });
           }
+
+          
         } else {
           toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ error: "unknown_tool" }) });
         }
