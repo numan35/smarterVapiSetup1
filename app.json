@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "bolt-expo-nativewind",
+    "slug": "bolt-expo-nativewind",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "We use the microphone to place calls."
+      }
+    },
+    "android": {
+      "permissions": ["RECORD_AUDIO"]
+    },
+
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      // Supabase
+      "supabaseUrl": "https://lkoogdveljyxwweranaf.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxrb29nZHZlbGp5eHd3ZXJhbmFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5NjQ1MDEsImV4cCI6MjA3MjU0MDUwMX0.gER6-spRheuIzCe_ET-ntaklbRQHkmGb75I3UJkFYKs",
+      "supabaseFunctionsBase": "https://lkoogdveljyxwweranaf.functions.supabase.co",
+
+      // Dev token (for gating Edge Functions during MVP)
+      "devToken": "dev-token-123",
+
+      // Vapi integration (optional, for later)
+      "vapiBase": "https://api.vapi.ai",
+      "vapiApiKey": "YOUR_VAPI_KEY",
+      "vapiAssistantId": "asst_xxx"
+    }
+  }
+}
