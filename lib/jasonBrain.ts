@@ -71,5 +71,5 @@ export async function callJasonBrain(
     throw new Error(`jason-brain ${resp.status}: ${JSON.stringify(data ?? {})}`);
   }
 
-  return data.message; // OpenAI-style message (may include tool_calls)
+  return data; // OpenAI-style message (may include tool_calls)
 }
