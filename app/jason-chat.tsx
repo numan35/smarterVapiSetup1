@@ -360,7 +360,7 @@ export default function JasonChat() {
   const scrollRef = useRef<ScrollView>(null);
 
   function append(msgs: Msg[]) {
-    setMessages((m) => [...m, ...msgs]);
+    setMessages((m) => [...m, out.message]);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 10);
   }
 
