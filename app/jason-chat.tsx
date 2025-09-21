@@ -276,10 +276,11 @@ export default function JasonChat() {
   const scrollRef = useRef<ScrollView>(null);
 
   // ✅ FIXED: actually append what you pass in
-  function append(msgs: Msg[]) {
-    setMessages((m) => [...m, ...msgs]);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 10);
-  }
+ function append(msgs: Msg[]) {
+  setMessages((m) => [...m, ...msgs]);           // ← append the msgs you pass in
+  setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 10);
+}
+
 
   // Apply a single annotation from the server to local slot state
   function applyAnnotation(key: string, value: any) {
