@@ -124,3 +124,4 @@ export async function callNow(args: CallNowBody): Promise<CallNowResponse> {
     };
   }
 }
+export default callNow;
