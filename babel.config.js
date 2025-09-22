@@ -5,8 +5,8 @@ module.exports = {
     [
       'module-resolver',
       {
-        root: ['.'],
-        alias: { '@': './' },
+        root: ["./project"],
+        alias: { "@": "./project" },
         // helps Babel resolve TS files during transform
         extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
       },
