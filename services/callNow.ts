@@ -96,6 +96,8 @@ export async function callNow(args: CallNowBody): Promise<CallNowResponse> {
     businessName: args.businessName ?? null,
     customerName: args.customerName ?? null,
   };
+  
+console.log("[callNow] POST", url);
 
   try {
     const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
