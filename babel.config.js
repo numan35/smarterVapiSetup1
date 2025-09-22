@@ -4,11 +4,8 @@ module.exports = function (api) {
     presets: ['babel-preset-expo'],
     plugins: [
       ['module-resolver', {
-        root: ['./project'],
-        alias: {
-          '@': './project',
-          '~': './'              // optional
-        },
+        root: ['./'],          // repo root
+        alias: { '@': './' },  // "@/lib/supabase" => ./lib/supabase
         extensions: ['.tsx', '.ts', '.js', '.json']
       }],
       'expo-router/babel',
