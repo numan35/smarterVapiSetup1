@@ -1,15 +1,17 @@
-// babel.config.js
-module.exports = {
-  presets: ['babel-preset-expo'], // includes expo-router transforms in SDK 54
-  plugins: [
-    [
-      'module-resolver',
-      {
-        root: ["./project"],
-        alias: { "@": "./project" },
-        // helps Babel resolve TS files during transform
-        extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
-      },
+module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+    plugins: [
+      ['module-resolver', {
+        root: ['./project'],
+        alias: {
+          '@': './project',
+          '~': './'              // optional
+        },
+        extensions: ['.tsx', '.ts', '.js', '.json']
+      }],
+      'expo-router/babel',
     ],
-  ],
+  };
 };
