@@ -1,3 +1,7 @@
+console.log('[lib/supabase] loaded from project/lib/supabase.ts');
+
+
+
 // lib/supabase.ts
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
