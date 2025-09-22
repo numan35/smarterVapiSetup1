@@ -1,4 +1,5 @@
-console.log('[lib/supabase] loaded from project/lib/supabase.ts');
+console.log('[supabase] loaded from lib/supabase.ts');
+
 
 
 
