@@ -1,6 +1,7 @@
 
 
-console.log("[callNow] loaded: project/services/callNow.ts");
+console.log('[callNow] loaded from services/callNow.ts');
+
 
 // services/callNow.ts
 import Constants from "expo-constants";
