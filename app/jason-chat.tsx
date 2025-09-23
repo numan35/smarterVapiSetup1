@@ -382,310 +382,46 @@ export default function JasonChat() {
     await runTurn([...protocolRef.current, userMsg], { ...slotsRef.current });
   }
 
-  async function runTurn(conversation: Msg[], slots: SlotsState) {
-    try {
-      setLoading(true);
+ async function runTurn(conversation: Msg[], slots: SlotsState) {
+  try {
+    setLoading(true);
 
-   m = await callJasonBrain(conversation, slots);
-logToolCallsAnyShape(m, "#1");
+    // Call Jason Brain
+    let m = await callJasonBrain(conversation, slots);
+    logToolCallsAnyShape(m, "#1");
 
-// ✅ include this assistant message (with possible tool_calls)
-protocolRef.current = [...conversation, m];
+    // Include this assistant message in the protocol
+    protocolRef.current = [...conversation, m];
 
-// 🔎 harvest slot_set annotations from the assistant message
-if (Array.isArray(m?.annotations)) {
-  const next = { ...(slots.details ?? {}) };
-  for (const a of m.annotations) {
-    if (a?.type === "slot_set" && a.key) {
-      next[a.key] = a.value;
+    // 🔎 Harvest slot_set annotations from this assistant message
+    if (Array.isArray(m?.annotations)) {
+      const next = { ...(slots.details ?? {}) };
+      for (const a of m.annotations) {
+        if (a?.type === "slot_set" && a.key) {
+          next[a.key] = a.value;
+        }
+      }
+      setState((s) => ({ ...s, details: next }));
     }
+
+    // Guard for AI text
+    let aiText = (m?.content && typeof m.content === "string") ? m.content : "";
+    if (
+      (slotsRef.current.mode ?? "discovery") === "discovery" &&
+      /\b(date|time|party size|how many)\b/i.test(aiText) &&
+      /\b(suggest|recommend|best|options|near|in )/i.test(conversation[conversation.length - 1]?.content || "")
+    ) {
+      aiText = "Got it — I’ll suggest nearby options first. Any price range or vibe you prefer?";
+    }
+    if (aiText) append([{ role: "assistant", content: aiText }]);
+
+    // … keep the rest of your while-loop for tool_calls here …
+  } catch (e: any) {
+    append([{ role: "assistant", content: `Error: ${e?.message || String(e)}` }]);
+  } finally {
+    setLoading(false);
   }
-  setState((s) => ({ ...s, details: next }));
 }
-
-
-      // light guard
-      let aiText = (m?.content && typeof m.content === "string") ? m.content : "";
-      if ((slotsRef.current.mode ?? "discovery") === "discovery" &&
-          /\b(date|time|party size|how many)\b/i.test(aiText) &&
-          /\b(suggest|recommend|best|options|near|in )/i.test(conversation[conversation.length - 1]?.content || "")) {
-        aiText = "Got it — I’ll suggest nearby options first. Any price range or vibe you prefer?";
-      }
-      if (aiText) append([{ role: "assistant", content: aiText }]);
-
-      let needUserAnswer = false;
-
-      while (Array.isArray(m?.tool_calls) && m.tool_calls.length > 0 && !needUserAnswer) {
-        const toolResults: Msg[] = [];
-
-        for (const tc of m.tool_calls) {
-          const name: string = tc?.function?.name ?? "";
-          const rawArgs: string = tc?.function?.arguments ?? "{}";
-
-          let args: any = {};
-          try { args = JSON.parse(rawArgs || "{}"); } catch { args = {}; }
-
-          if (name === "upsert_request_slots") {
-            console.log("🧩 upsert_request_slots args (parsed):", args);
-
-            const prev = slots.details ?? {};
-            const fromDetails = (args?.details && typeof args.details === "object") ? args.details : {};
-            const normalized: NonNullable<SlotsState["details"]> = { ...prev, ...fromDetails };
-
-            const top = args || {};
-            const pick = (...keys: string[]) => {
-              for (const k of keys) {
-                const v =
-                  top[k] ??
-                  top[k.replace(/[A-Z]/g, (m) => "_" + m.toLowerCase())] ??
-                  (k.toLowerCase ? top[k.toLowerCase()] : undefined);
-                if (v !== undefined && v !== null && String(v).trim() !== "") return v;
-              }
-              return undefined;
-            };
-
-            const rn = pick("restaurantName", "name", "restaurant");
-            if (rn) normalized.restaurantName = String(rn).trim();
-
-            const ps = pick("partySize", "party_size", "party-size");
-            if (ps !== undefined && !Number.isNaN(Number(ps))) normalized.partySize = Number(ps);
-
-            const date = pick("date");
-            if (date) {
-              const parsed = parseNaturalDateToISO(String(date));
-              normalized.date = parsed ?? String(date).trim();
-            }
-
-            const ts = pick("timeWindowStart", "start", "time_start");
-            if (ts) normalized.timeWindowStart = String(ts).trim();
-
-            const te = pick("timeWindowEnd", "end", "time_end");
-            if (te) normalized.timeWindowEnd = String(te).trim();
-
-            const sp = pick("specialRequests", "notes");
-            if (sp !== undefined) normalized.specialRequests = String(sp);
-
-            const userPh = pick("userPhone", "user_phone");
-            if (userPh) normalized.userPhone = String(userPh).startsWith("+") ? String(userPh) : maybeExtractPhoneFromText(String(userPh)) ?? String(userPh);
-
-            const destPh = pick(
-              "restaurantPhone",
-              "targetPhone",
-              "restaurant_phone",
-              "target_phone",
-              "phone",
-              "international_phone_number"
-            );
-            if (destPh) {
-              const v = String(destPh);
-              const e164 = v.startsWith("+") ? v : (maybeExtractPhoneFromText(v) ?? v);
-              normalized.restaurantPhone = e164;
-              normalized.targetPhone = e164;
-            }
-
-            const addr = pick("address", "formattedAddress", "formatted_address");
-            if (addr) normalized.address = String(addr);
-            const web = pick("website", "url");
-            if (web) normalized.website = String(web);
-            const pid = pick("placeId", "place_id");
-            if (pid) normalized.placeId = String(pid);
-            const city = pick("city", "locality");
-            if (city) normalized.city = String(city);
-            const dist = pick("distanceMi", "distance_mi");
-            if (dist !== undefined && !Number.isNaN(Number(dist))) normalized.distanceMi = Number(dist);
-
-            if (args?.desiredStart) {
-              const p = parseISOishDateTime(args.desiredStart);
-              if (p) { normalized.date ??= p.date; normalized.timeWindowStart ??= p.time; }
-            }
-            if (args?.desiredEnd) {
-              const p = parseISOishDateTime(args.desiredEnd);
-              if (p) normalized.timeWindowEnd ??= p.time;
-            }
-
-            const next: SlotsState = {
-              ...slots,
-              ...(args?.kind ? { kind: args.kind } : {}),
-              ...(args?.desiredStart !== undefined ? { desiredStart: args.desiredStart } : {}),
-              ...(args?.desiredEnd !== undefined ? { desiredEnd: args.desiredEnd } : {}),
-              details: normalized,
-            };
-            slots = next;
-            setState(next);
-
-            toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ ok: true, state: next }) });
-          } else if (name === "ask_user") {
-            let prompt = String(args?.question ?? "").trim();
-            if (!prompt) prompt = "Could you clarify a bit more?";
-            if ((slotsRef.current.mode ?? "discovery") === "booking") {
-              const d = slots.details ?? {};
-              const missing: string[] = [];
-              if (!d.restaurantName) missing.push("restaurant name");
-              if (!d.partySize) missing.push("party size");
-              if (!d.date) missing.push("date");
-              if (!d.timeWindowStart || !d.timeWindowEnd) missing.push("specific time or 30-min window");
-              if (!args?.question && missing.length) {
-                prompt = `I have some details, but I still need: ${missing.join(", ")}. Tell me whatever you know and we’ll go from there.`;
-              }
-            }
-            append([{ role: "assistant", content: prompt }]);
-            toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ asked: true }) });
-            needUserAnswer = true;
-          } else if (name === "guide_user") {
-            const title = String(args?.title ?? "Steps");
-            const steps = Array.isArray(args?.steps) ? args?.steps : [];
-            const pretty = `**${title}**\n${steps.map((s: string, i: number) => `${i + 1}. ${s}`).join("\n")}`;
-            append([{ role: "assistant", content: pretty }]);
-            toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ ok: true }) });
-          } else if (name === "confirm") {
-            const summary = String(args?.summary ?? "");
-            const desiredDate = parseISOishDateTime(slots.desiredStart || "")?.date;
-            const derived = parseConfirmSummary(summary, desiredDate);
-            const merged = { ...(slots.details ?? {}), ...derived };
-            if (merged.timeWindowStart && !merged.timeWindowEnd) {
-              merged.timeWindowEnd = addMinutes(merged.timeWindowStart, 30);
-            }
-            slots = { ...slots, details: merged };
-            setState(slots);
-            append([{ role: "assistant", content: summary || "Confirm?" }]);
-            toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ ok: true, details: merged }) });
-          } else if (name === "start_request") {
-            const details = { ...(slots.details ?? {}) };
-
-            if ((!details.date || !details.timeWindowStart || !details.timeWindowEnd) && (slots.desiredStart || slots.desiredEnd)) {
-              const pS = parseISOishDateTime(slots.desiredStart || "");
-              const pE = parseISOishDateTime(slots.desiredEnd || "");
-              if (pS) { details.date ??= pS.date; details.timeWindowStart ??= pS.time; }
-              if (pE) { details.timeWindowEnd ??= pE.time; }
-            }
-            if (details.date) {
-              const parsed = parseNaturalDateToISO(String(details.date));
-              if (parsed) details.date = parsed;
-            }
-
-            const restaurantName = String(details.restaurantName ?? details.name ?? "").trim();
-            const partySize = Number(details.partySize ?? 0);
-            const date = String(details.date ?? "").trim();
-            const tStart = String(details.timeWindowStart ?? "").trim();
-            const tEnd = String(details.timeWindowEnd ?? "").trim();
-
-            // --- resolve destination phone ---
-            let targetPhone: string | undefined =
-              details.restaurantPhone || details.targetPhone || (args?.targetPhone as string | undefined);
-
-            const PHONE_BOOK: Record<string, string> = {
-              "rumi's kitchen": "+17706920100",
-              "rumis kitchen": "+17706920100",
-              "rumi’s kitchen": "+17706920100",
-            };
-            if (!targetPhone && restaurantName) {
-              const key = restaurantName.toLowerCase();
-              targetPhone = PHONE_BOOK[key];
-            }
-
-            if (!targetPhone && details.placeId) {
-              const fetched = await fetchPhoneByPlaceId(details.placeId);
-              if (fetched) {
-                targetPhone = fetched;
-                details.restaurantPhone = fetched;
-                details.targetPhone = fetched;
-                setState((s) => ({
-                  ...s,
-                  details: { ...(s.details ?? {}), restaurantPhone: fetched, targetPhone: fetched },
-                }));
-              }
-            }
-
-            const missing: string[] = [];
-            if (!restaurantName) missing.push("restaurantName");
-            if (!partySize) missing.push("partySize");
-            if (!date) missing.push("date");
-            if (!tStart) missing.push("timeWindowStart");
-            if (!tEnd) missing.push("timeWindowEnd");
-
-            if (missing.length) {
-              append([{ role: "assistant", content: `I’m missing: ${missing.join(", ")}. What should I fill in?` }]);
-              toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ error: "missing_required_slots", missing }) });
-              needUserAnswer = true;
-              continue;
-            }
-
-            if (!targetPhone) {
-              append([{ role: "assistant", content: `I don’t have a phone number for ${restaurantName}. What number should I call to book?` }]);
-              setState((s) => ({ ...s, ui: { ...(s.ui ?? {}), expectingDestPhone: true } }));
-              toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ queued: false, reason: "missing_destination_phone" }) });
-              needUserAnswer = true;
-              continue;
-            }
-
-            const notes =
-              `Restaurant reservation request: ` +
-              `${partySize} people on ${date} between ${tStart}–${tEnd} (${TZ})` +
-              (details.specialRequests ? `; Special requests: ${details.specialRequests}` : "") +
-              (details.userPhone ? `; User phone: ${details.userPhone}` : "");
-
-            const script =
-              `Hi, is this ${restaurantName}? I'm Jason calling on behalf of a customer. ` +
-              `I'd like to book a table for ${partySize} on ${date} between ${tStart} and ${tEnd}. ` +
-              (details.specialRequests ? `Special request: ${details.specialRequests}. ` : "") +
-              `If that time isn't available, please offer the closest alternatives within 60 minutes. ` +
-              `Once confirmed, please repeat the reservation details back.`;
-
-            try {
-              const res = await callNow({
-                targetName: restaurantName,
-                targetPhone,
-                // @ts-expect-error: extend CallNowInput to support placeId if you want to store it
-                placeId: details.placeId,
-                notes,
-                script,
-                source: "jason",
-              });
-
-              if (res?.ok && res?.callId) {
-                append([{ role: "assistant", content: `Calling ${restaurantName} now… (Call ID: ${res.callId})` }]);
-                toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ queued: true, callId: res.callId }) });
-              } else {
-                append([{ role: "assistant", content: `I couldn’t start the call: ${res?.error ?? "unknown error"}` }]);
-                toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ queued: false, error: res?.error ?? "call_failed" }) });
-              }
-            } catch (err: any) {
-              append([{ role: "assistant", content: `Call error: ${err?.message ?? String(err)}` }]);
-              toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ queued: false, error: String(err) }) });
-            }
-          } else {
-            toolResults.push({ role: "tool", name, tool_call_id: tc.id, content: JSON.stringify({ error: "unknown_tool" }) });
-          }
-        }
-
-        // ⛑️ If a tool asked the user something, we MUST persist those tool replies
-        if (needUserAnswer) {
-          const protoWithTools = [...conversation, m, ...toolResults];
-          protocolRef.current = protoWithTools; // <-- critical line
-          break;
-        }
-
-        const nextConversation = [...conversation, m, ...toolResults];
-        protocolRef.current = nextConversation;
-
-        m = await callJasonBrain(nextConversation, slots);
-        logToolCallsAnyShape(m, "#2");
-
-        let aiFollow = (m?.content && typeof m.content === "string") ? m.content : "";
-        if ((slotsRef.current.mode ?? "discovery") === "discovery" &&
-            /\b(date|time|party size|how many)\b/i.test(aiFollow)) {
-          aiFollow = "Here are some nearby options first — any price range or vibe you prefer?";
-        }
-        if (aiFollow) append([{ role: "assistant", content: aiFollow }]);
-
-        conversation = nextConversation;
-      }
-    } catch (e: any) {
-      append([{ role: "assistant", content: `Error: ${e?.message || String(e)}` }]);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const d = state.details ?? {};
   const friendlyDate = prettyDate(d.date);
