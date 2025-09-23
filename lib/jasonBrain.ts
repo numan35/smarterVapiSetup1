@@ -33,13 +33,11 @@ export default async function callJasonBrain(
   }
   const url = `${FUNCTIONS_BASE}/jason-brain`;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (ANON) {
-    headers["Authorization"] = `Bearer ${ANON}`;
-    headers["apikey"] = ANON;
-  }
+ const headers: Record<string, string> = {
+  "Content-Type": "application/json",
+  ...(ANON ? { "Authorization": `Bearer ${ANON}`, "apikey": ANON } : {}),
+};
+
 
   // optional model-free sanity
   if (opts?.dryRun) headers["x-dry-run"] = "1";
