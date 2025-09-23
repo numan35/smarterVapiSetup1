@@ -392,8 +392,17 @@ export default function JasonChat() {
       // ✅ include this assistant message (with possible tool_calls)
       protocolRef.current = [...conversation, m];
 
-      let m = await callJasonBrain(conversation, slots);
-logToolCallsAnyShape(m, "#1");
+      // 🔎 harvest slot_set annotations from the assistant message
+if (Array.isArray(m?.annotations)) {
+  const next = { ...(slots.details ?? {}) };
+  for (const a of m.annotations) {
+    if (a?.type === "slot_set" && a.key) {
+      next[a.key] = a.value;
+    }
+  }
+  setState((s) => ({ ...s, details: next }));
+}
+
 
       // light guard
       let aiText = (m?.content && typeof m.content === "string") ? m.content : "";
