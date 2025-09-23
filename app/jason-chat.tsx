@@ -15,6 +15,8 @@ import { useRouter } from "expo-router";
 import callJasonBrain from "@/lib/jasonBrain"; // ✅ default import (was named)
 import { callNow } from "@/services/callNow";
 import Constants from "expo-constants";
+import ReservationGate from "@/app/components/ReservationGate";
+
 
 // ---------- Debug helpers ----------
 function logToolCallsAnyShape(m: any, tag = "") {
