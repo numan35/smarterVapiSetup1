@@ -386,7 +386,7 @@ export default function JasonChat() {
     try {
       setLoading(true);
 
-   let m = await callJasonBrain(conversation, slots);
+   m = await callJasonBrain(conversation, slots);
 logToolCallsAnyShape(m, "#1");
 
 // ✅ include this assistant message (with possible tool_calls)
