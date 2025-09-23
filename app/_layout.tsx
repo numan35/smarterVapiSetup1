@@ -12,17 +12,9 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { callJasonBrain } from "@/lib/jasonBrain";
+import callJasonBrain from "@/lib/jasonBrain"; // ✅ default import (was named)
 import { callNow } from "@/services/callNow";
 import Constants from "expo-constants";
-// app/_layout.tsx
-import { Stack, } from "expo-router";
-import { useEffect } from "react";
-
-export default function RootLayout() {
-  return <Stack initialRouteName="test-brain" />;
-}
-
 
 // ---------- Debug helpers ----------
 function logToolCallsAnyShape(m: any, tag = "") {
