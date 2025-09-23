@@ -374,7 +374,6 @@ export default function JasonChat() {
     ...(state?.radiusMiles ? { radiusMiles: state.radiusMiles } : {}),
   };
 
-  // --- call Jason with full transcript + non-blocking hints
  // --- call Jason with full transcript + optional hints
 await runTurn(
   [...protocolRef.current, userMsg],
