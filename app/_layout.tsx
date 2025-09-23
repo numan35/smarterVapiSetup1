@@ -16,7 +16,7 @@ import { callJasonBrain } from "@/lib/jasonBrain";
 import { callNow } from "@/services/callNow";
 import Constants from "expo-constants";
 // app/_layout.tsx
-import { Stack, router } from "expo-router";
+import { Stack, } from "expo-router";
 import { useEffect } from "react";
 
 export default function RootLayout() {
