@@ -322,8 +322,9 @@ export default function JasonChat() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 10);
   }
 
-  async function handleSend(input: string) {
+ async function handleSend(input: string) {
   if (!input.trim() || loading) return;
+
   const userMsg: Msg = { role: "user", content: input.trim() };
 
   // --- decide mode (discovery vs booking)
@@ -331,7 +332,11 @@ export default function JasonChat() {
   const showsBookingIntent =
     /\b(book|reserve|reservation|call (?:and )?make|make (?:a )?reservation|hold a table|please call)\b/.test(lower) ||
     /\b(let'?s do|go with|choose|pick)\b/.test(lower);
-  setState((s) => ({ ...s, mode: showsBookingIntent ? "booking" : (s.mode ?? "discovery") }));
+
+  setState((s) => ({
+    ...s,
+    mode: showsBookingIntent ? "booking" : (s.mode ?? "discovery"),
+  }));
 
   // --- geo hints (optional — keep if useful)
   if (/\broseville\b/i.test(userMsg.content)) {
@@ -353,8 +358,27 @@ export default function JasonChat() {
   append([userMsg]);
   setText("");
 
-  // --- call Jason with full transcript
-  await runTurn([...protocolRef.current, userMsg], { ...slotsRef.current });
+  // --- optional slot hints (do NOT block send)
+  // Pull any known defaults from state and a lightweight phone scrape from the message.
+  const knownCity = state?.city || undefined; // if you track a default city in state
+  const knownPhone = state?.userPhone || undefined;
+
+  // try to extract a phone from the user message (very light; server will re-validate)
+  const msgPhoneMatch = userMsg.content.match(/\+?[1-9]\d{6,14}/);
+  const hintedUserPhone = msgPhoneMatch?.[0] || knownPhone;
+
+  const slotHints: Record<string, any> = {
+    ...(knownCity ? { city: knownCity } : {}),
+    ...(hintedUserPhone ? { userPhone: hintedUserPhone } : {}),
+    ...(state?.geoCenter ? { lat: state.geoCenter.lat, lng: state.geoCenter.lng } : {}),
+    ...(state?.radiusMiles ? { radiusMiles: state.radiusMiles } : {}),
+  };
+
+  // --- call Jason with full transcript + non-blocking hints
+  await runTurn(
+    [...protocolRef.current, userMsg],
+    { ...slotsRef.current, ...slotHints }
+  );
 }
 
 
