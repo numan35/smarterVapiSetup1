@@ -313,6 +313,29 @@ export default function JasonChat() {
     });
   };
 
+
+  const [gateReady, setGateReady] = useState(false);
+const [prefill, setPrefill] = useState<any>(null);
+
+async function startWith(form: any) {
+  setGateReady(true);
+  setPrefill(form);
+
+  // Compose a natural message (nice UX) AND pass slots
+  const content = `Book ${form.restaurantName ?? ""} in ${form.city ?? ""} for ${form.partySize} on ${form.date} at ${form.time}. My phone is ${form.userPhone}.`;
+  await sendMessage(content, {
+    restaurantName: form.restaurantName,
+    city: form.city,
+    targetPhone: form.targetPhone,
+    partySize: form.partySize,
+    date: form.date,
+    time: form.time,
+    userPhone: form.userPhone,
+    consentToCall: true
+  });
+}
+
+
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
