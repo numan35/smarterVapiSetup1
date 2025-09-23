@@ -21,6 +21,7 @@ import { useEffect } from "react";
 
 export default function RootLayout() {
   return <Stack initialRouteName="test-brain" />;
+}
 
 
 // ---------- Debug helpers ----------
