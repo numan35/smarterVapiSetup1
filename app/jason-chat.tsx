@@ -428,75 +428,79 @@ async function startWith(form: any) {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={0}>
-        <View style={{ padding: 12, backgroundColor: "#111", paddingTop: Math.max(insets.top, 12) }}>
-          <Text style={{ color: "#fff", fontWeight: "600" }}>Slots</Text>
-          <Text style={{ color: "#ddd" }}>mode: {state.mode ?? "discovery"}</Text>
-          <Text style={{ color: "#ddd" }}>kind: {state.kind ?? "-"}</Text>
-          <Text style={{ color: "#ddd" }}>
-            geo: {state.geoCenter ? `${state.geoCenter.lat.toFixed(4)}, ${state.geoCenter.lng.toFixed(4)}` : "-"}
-            {state.radiusMiles ? ` • ≤ ${state.radiusMiles} mi` : ""}
-          </Text>
-          <Text style={{ color: "#ddd" }}>address: {d.address ?? "-"}</Text>
-          <Text style={{ color: "#ddd" }}>website: {d.website ?? "-"}</Text>
-          <Text style={{ color: "#ddd" }}>placeId: {d.placeId ?? "-"}</Text>
-          <Text style={{ color: "#ddd" }}>desired: {state.desiredStart ?? "-"} → {state.desiredEnd ?? "-"}</Text>
-          <Text style={{ color: "#ddd" }}>restaurant: {d.restaurantName ?? "-"}</Text>
-          <Text style={{ color: "#ddd" }}>partySize: {d.partySize ?? "-"}</Text>
-          <Text style={{ color: "#ddd" }}>
-            date/time: {friendlyDate} {friendlyDate !== "-" && friendlyTime !== "-" ? "•" : ""} {friendlyTime}
-          </Text>
-          <Text style={{ color: "#ddd" }}>user phone: {d.userPhone ?? "-"}</Text>
-          <Text style={{ color: "#ddd" }}>dest phone: {d.restaurantPhone ?? d.targetPhone ?? "-"}</Text>
-          <Text style={{ color: "#ddd" }}>awaiting dest phone? {state.ui?.expectingDestPhone ? "yes" : "no"}</Text>
-          <Text style={{ color: "#ddd" }}>details keys: {Object.keys(state.details ?? {}).length}</Text>
-        </View>
+      {!gateReady ? (
+        <ReservationGate onReady={startWith} />
+      ) : (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={0}>
+          <View style={{ padding: 12, backgroundColor: "#111", paddingTop: Math.max(insets.top, 12) }}>
+            <Text style={{ color: "#fff", fontWeight: "600" }}>Slots</Text>
+            <Text style={{ color: "#ddd" }}>mode: {state.mode ?? "discovery"}</Text>
+            <Text style={{ color: "#ddd" }}>kind: {state.kind ?? "-"}</Text>
+            <Text style={{ color: "#ddd" }}>
+              geo: {state.geoCenter ? `${state.geoCenter.lat.toFixed(4)}, ${state.geoCenter.lng.toFixed(4)}` : "-"}
+              {state.radiusMiles ? ` • ≤ ${state.radiusMiles} mi` : ""}
+            </Text>
+            <Text style={{ color: "#ddd" }}>address: {d.address ?? "-"}</Text>
+            <Text style={{ color: "#ddd" }}>website: {d.website ?? "-"}</Text>
+            <Text style={{ color: "#ddd" }}>placeId: {d.placeId ?? "-"}</Text>
+            <Text style={{ color: "#ddd" }}>desired: {state.desiredStart ?? "-"} → {state.desiredEnd ?? "-"}</Text>
+            <Text style={{ color: "#ddd" }}>restaurant: {d.restaurantName ?? "-"}</Text>
+            <Text style={{ color: "#ddd" }}>partySize: {d.partySize ?? "-"}</Text>
+            <Text style={{ color: "#ddd" }}>
+              date/time: {friendlyDate} {friendlyDate !== "-" && friendlyTime !== "-" ? "•" : ""} {friendlyTime}
+            </Text>
+            <Text style={{ color: "#ddd" }}>user phone: {d.userPhone ?? "-"}</Text>
+            <Text style={{ color: "#ddd" }}>dest phone: {d.restaurantPhone ?? d.targetPhone ?? "-"}</Text>
+            <Text style={{ color: "#ddd" }}>awaiting dest phone? {state.ui?.expectingDestPhone ? "yes" : "no"}</Text>
+            <Text style={{ color: "#ddd" }}>details keys: {Object.keys(state.details ?? {}).length}</Text>
+          </View>
 
-        <ScrollView
-          ref={scrollRef}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1, paddingBottom: insets.bottom + 96 }}
-        >
-          {messages.map((m, i) => (
-            <View
-              key={i}
-              style={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                backgroundColor: m.role === "user" ? "#1e90ff" : "#333",
-                padding: 10,
-                borderRadius: 10,
-                maxWidth: "90%",
-              }}
-            >
-              <Text style={{ color: "white" }}>{m.content}</Text>
-            </View>
-          ))}
-          {loading && <ActivityIndicator />}
-        </ScrollView>
+          <ScrollView
+            ref={scrollRef}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1, paddingBottom: insets.bottom + 96 }}
+          >
+            {messages.map((m, i) => (
+              <View
+                key={i}
+                style={{
+                  alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+                  backgroundColor: m.role === "user" ? "#1e90ff" : "#333",
+                  padding: 10,
+                  borderRadius: 10,
+                  maxWidth: "90%",
+                }}
+              >
+                <Text style={{ color: "white" }}>{m.content}</Text>
+              </View>
+            ))}
+            {loading && <ActivityIndicator />}
+          </ScrollView>
 
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 8,
-            padding: 12,
-            borderTopWidth: 1,
-            borderColor: "#ddd",
-            paddingBottom: Math.max(insets.bottom, 12),
-            backgroundColor: "white",
-          }}
-        >
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder="Type to Jason…"
-            style={{ flex: 1, borderWidth: 1, borderRadius: 8, padding: 10 }}
-            editable={!loading}
-            blurOnSubmit={false}
-            onSubmitEditing={() => !loading && text && handleSend(text)}
-          />
-          <Button title="Send" onPress={() => handleSend(text)} disabled={loading} />
-        </View>
-      </KeyboardAvoidingView>
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 8,
+              padding: 12,
+              borderTopWidth: 1,
+              borderColor: "#ddd",
+              paddingBottom: Math.max(insets.bottom, 12),
+              backgroundColor: "white",
+            }}
+          >
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder="Type to Jason…"
+              style={{ flex: 1, borderWidth: 1, borderRadius: 8, padding: 10 }}
+              editable={!loading}
+              blurOnSubmit={false}
+              onSubmitEditing={() => !loading && text && handleSend(text)}
+            />
+            <Button title="Send" onPress={() => handleSend(text)} disabled={loading} />
+          </View>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }
