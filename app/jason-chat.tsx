@@ -375,10 +375,16 @@ export default function JasonChat() {
   };
 
   // --- call Jason with full transcript + non-blocking hints
-  await runTurn(
-    [...protocolRef.current, userMsg],
-    { ...slotsRef.current, ...slotHints }
-  );
+ // --- call Jason with full transcript + optional hints
+await runTurn(
+  [...protocolRef.current, userMsg],
+  {
+    ...slotsRef.current,       // keep existing slots
+    city: "New York",          // optional hint
+    userPhone: "+1 212 555 1234" // optional hint
+  }
+);
+
 }
 
 
