@@ -392,6 +392,9 @@ export default function JasonChat() {
       // ✅ include this assistant message (with possible tool_calls)
       protocolRef.current = [...conversation, m];
 
+      let m = await callJasonBrain(conversation, slots);
+logToolCallsAnyShape(m, "#1");
+
       // light guard
       let aiText = (m?.content && typeof m.content === "string") ? m.content : "";
       if ((slotsRef.current.mode ?? "discovery") === "discovery" &&
