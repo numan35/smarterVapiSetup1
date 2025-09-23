@@ -20,15 +20,7 @@ import { Stack, router } from "expo-router";
 import { useEffect } from "react";
 
 export default function RootLayout() {
-  // Dev-only redirect: remove when done testing
-  if (__DEV__) {
-    useEffect(() => {
-      router.replace("/test-brain");
-    }, []);
-  }
-
-  return <Stack />;
-}
+  return <Stack initialRouteName="test-brain" />;
 
 
 // ---------- Debug helpers ----------
