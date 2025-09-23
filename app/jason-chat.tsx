@@ -386,13 +386,13 @@ export default function JasonChat() {
     try {
       setLoading(true);
 
-      let m = await callJasonBrain(conversation, slots);
-      logToolCallsAnyShape(m, "#1");
+   let m = await callJasonBrain(conversation, slots);
+logToolCallsAnyShape(m, "#1");
 
-      // ✅ include this assistant message (with possible tool_calls)
-      protocolRef.current = [...conversation, m];
+// ✅ include this assistant message (with possible tool_calls)
+protocolRef.current = [...conversation, m];
 
-      // 🔎 harvest slot_set annotations from the assistant message
+// 🔎 harvest slot_set annotations from the assistant message
 if (Array.isArray(m?.annotations)) {
   const next = { ...(slots.details ?? {}) };
   for (const a of m.annotations) {
