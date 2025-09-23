@@ -9,7 +9,7 @@ export default function TestBrainScreen() {
   async function runTest() {
     try {
       setLoading(true);
-      const m = await callJasonBrain([{ role: "user", content: "Hi Jason! One-sentence hello." }]);
+await callJasonBrain([{ role: 'user', content: "Book Via Carota for 2 tomorrow at 19:00. My phone is +1 212 555 1234." }])
       // m should be an OpenAI-style message
       setOut(JSON.stringify(m, null, 2));
       console.log("Jason says:", m);
