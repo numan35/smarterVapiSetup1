@@ -387,33 +387,67 @@ await runTurn(
 }
 
 
- async function runTurn(fullConversation: Msg[], slotHints: Record<string, any>) {
-  // 1) call Jason
-  const reply = await callJasonBrain(fullConversation, slotHints);
+ async function runTurn(conversation: Msg[], slots: SlotsState) {
+  try {
+    setLoading(true);
 
-  // 2) extract slot_set annotations from Jason’s reply
-  const anns = reply?.message?.annotations ?? reply?.annotations ?? [];
-  const filled: Record<string, any> = {};
-  for (const a of anns) {
-    if (a?.type === "slot_set" && a?.key) {
-      filled[a.key] = a.value ?? null;
+    // 1) Call Jason Brain
+    const m = await callJasonBrain(conversation, slots);
+    logToolCallsAnyShape(m, "#1");
+
+    // 2) Extract slot_set annotations (supports both shapes)
+    const anns = (m?.message?.annotations ?? m?.annotations ?? []) as any[];
+    const filled: Record<string, any> = {};
+    for (const a of anns) {
+      if (a?.type === "slot_set" && a?.key) {
+        filled[a.key] = a.value ?? null;
+      }
     }
+
+    // 3) Persist into your *live slot store* (critical so the next turn carries these forward)
+    slotsRef.current = { ...slotsRef.current, ...filled };
+
+    // 4) Mirror into UI state so the Slots panel updates
+    setState((s) => ({
+      ...s,
+      details: { ...(s.details ?? {}), ...filled },
+    }));
+
+    // 5) Include this assistant message in the protocol *after* merging
+    //    (m may be a "message" already; normalize to a message shape)
+    const assistantMsg: Msg =
+      m?.role && m?.content
+        ? (m as Msg)
+        : { role: "assistant", content: String(m?.content ?? "") };
+
+    protocolRef.current = [...conversation, assistantMsg];
+
+    // 6) Guard / rewrite assistant text if desired
+    let aiText =
+      typeof assistantMsg.content === "string" ? assistantMsg.content : "";
+
+    if (
+      (slotsRef.current.mode ?? "discovery") === "discovery" &&
+      /\b(date|time|party size|how many)\b/i.test(aiText) &&
+      /\b(suggest|recommend|best|options|near|in )/i.test(
+        conversation[conversation.length - 1]?.content || ""
+      )
+    ) {
+      aiText =
+        "Got it — I’ll suggest nearby options first. Any price range or vibe you prefer?";
+    }
+
+    // 7) Append assistant message to chat
+    if (aiText) append([{ role: "assistant", content: aiText }]);
+
+    // … keep the rest of your tool-calls / loops here …
+  } catch (e: any) {
+    append([
+      { role: "assistant", content: `Error: ${e?.message || String(e)}` },
+    ]);
+  } finally {
+    setLoading(false);
   }
-
-  // 3) persist into your slot store
-  slotsRef.current = { ...slotsRef.current, ...filled };
-
-  // 4) update UI state (so the Slots panel shows the new values)
-  setState(s => ({
-    ...s,
-    details: { ...(s.details ?? {}), ...filled },
-  }));
-
-  // 5) append Jason’s reply to the chat
-  append([reply.message]);
-
-  // 6) update protocol so the next turn has the full transcript
-  protocolRef.current = [...fullConversation, reply.message];
 }
 
   const d = state.details ?? {};
