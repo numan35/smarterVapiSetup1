@@ -321,66 +321,40 @@ export default function JasonChat() {
   }
 
   async function handleSend(input: string) {
-    if (!input.trim() || loading) return;
-    const userMsg: Msg = { role: "user", content: input.trim() };
+  if (!input.trim() || loading) return;
+  const userMsg: Msg = { role: "user", content: input.trim() };
 
-    // --- decide mode (discovery vs booking)
-    const lower = userMsg.content.toLowerCase();
-    const showsBookingIntent =
-      /\b(book|reserve|reservation|call (?:and )?make|make (?:a )?reservation|hold a table|please call)\b/.test(lower) ||
-      /\b(let'?s do|go with|choose|pick)\b/.test(lower);
-    setState((s) => ({ ...s, mode: showsBookingIntent ? "booking" : (s.mode ?? "discovery") }));
+  // --- decide mode (discovery vs booking)
+  const lower = userMsg.content.toLowerCase();
+  const showsBookingIntent =
+    /\b(book|reserve|reservation|call (?:and )?make|make (?:a )?reservation|hold a table|please call)\b/.test(lower) ||
+    /\b(let'?s do|go with|choose|pick)\b/.test(lower);
+  setState((s) => ({ ...s, mode: showsBookingIntent ? "booking" : (s.mode ?? "discovery") }));
 
-    // geo seeds
-    if (/\broseville\b/i.test(userMsg.content)) {
-      setState((s) => ({
-        ...s,
-        geoCenter: s.geoCenter ?? { lat: 38.7521, lng: -121.2880 },
-        radiusMiles: s.radiusMiles ?? 3,
-      }));
-    }
-    if (/\balpharetta\b/i.test(userMsg.content)) {
-      setState((s) => ({
-        ...s,
-        geoCenter: s.geoCenter ?? { lat: 34.0754, lng: -84.2941 },
-        radiusMiles: s.radiusMiles ?? 3,
-      }));
-    }
-
-    // opportunistic captures
-    if ((slotsRef.current.mode ?? "discovery") === "booking") {
-      const maybeDate = parseNaturalDateToISO(userMsg.content);
-      if (maybeDate) setState((s) => ({ ...s, details: { ...(s.details ?? {}), date: maybeDate } }));
-    }
-
-    const num = maybeExtractPhoneFromText(userMsg.content);
-    if (num) {
-      setState((s) => {
-        const expectingDest = !!s.ui?.expectingDestPhone;
-        const aboutDest = messageImpliesDestinationPhone(userMsg.content);
-        const alreadyHasUser = !!s.details?.userPhone;
-        const alreadyHasDest = !!(s.details?.restaurantPhone || s.details?.targetPhone);
-
-        if (expectingDest || aboutDest || (!alreadyHasDest && alreadyHasUser)) {
-          return { ...s, details: { ...(s.details ?? {}), restaurantPhone: num, targetPhone: num }, ui: { ...(s.ui ?? {}), expectingDestPhone: false } };
-        }
-        if (/\b(my number|my phone)\b/i.test(userMsg.content)) {
-          return { ...s, details: { ...(s.details ?? {}), userPhone: num } };
-        }
-        if (!alreadyHasUser) {
-          return { ...s, details: { ...(s.details ?? {}), userPhone: num } };
-        } else {
-          return { ...s, details: { ...(s.details ?? {}), restaurantPhone: num, targetPhone: num }, ui: { ...(s.ui ?? {}), expectingDestPhone: false } };
-        }
-      });
-    }
-
-    append([userMsg]);
-    setText("");
-
-    // ✅ Use protocol transcript when calling the model
-    await runTurn([...protocolRef.current, userMsg], { ...slotsRef.current });
+  // --- geo hints (optional — keep if useful)
+  if (/\broseville\b/i.test(userMsg.content)) {
+    setState((s) => ({
+      ...s,
+      geoCenter: s.geoCenter ?? { lat: 38.7521, lng: -121.2880 },
+      radiusMiles: s.radiusMiles ?? 3,
+    }));
   }
+  if (/\balpharetta\b/i.test(userMsg.content)) {
+    setState((s) => ({
+      ...s,
+      geoCenter: s.geoCenter ?? { lat: 34.0754, lng: -84.2941 },
+      radiusMiles: s.radiusMiles ?? 3,
+    }));
+  }
+
+  // --- show user message in chat
+  append([userMsg]);
+  setText("");
+
+  // --- call Jason with full transcript
+  await runTurn([...protocolRef.current, userMsg], { ...slotsRef.current });
+}
+
 
  async function runTurn(conversation: Msg[], slots: SlotsState) {
   try {
