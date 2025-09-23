@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { View, Text, Button, ScrollView, ActivityIndicator } from "react-native";
-import { callJasonBrain } from "@/lib/jasonBrain";
+import callJasonBrain from "@/lib/jasonBrain";
 
 export default function TestBrainScreen() {
   const [out, setOut] = useState<string>("(no output yet)");
