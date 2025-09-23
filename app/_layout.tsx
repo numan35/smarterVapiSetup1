@@ -15,6 +15,19 @@ import { useRouter } from "expo-router";
 import { callJasonBrain } from "@/lib/jasonBrain";
 import { callNow } from "@/services/callNow";
 import Constants from "expo-constants";
+import { Stack, router } from "expo-router";
+import { useEffect } from "react";
+
+export default function RootLayout() {
+  // ⬇️ Add this block; remove it after you're done testing
+  if (__DEV__) {
+    useEffect(() => {
+      router.replace("/test-brain");
+    }, []);
+  }
+
+  return <Stack />;
+}
 
 // ---------- Debug helpers ----------
 function logToolCallsAnyShape(m: any, tag = "") {
