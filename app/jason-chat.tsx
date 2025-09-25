@@ -452,7 +452,10 @@ await runTurn(
 
   const d = state.details ?? {};
   const friendlyDate = prettyDate(d.date);
-  const friendlyTime = prettyRange(d.timeWindowStart, d.timeWindowEnd);
+  const friendlyTime =
+    (d.timeWindowStart || d.timeWindowEnd)
+      ? prettyRange(d.timeWindowStart, d.timeWindowEnd)
+      : (d.time ?? "-");
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
