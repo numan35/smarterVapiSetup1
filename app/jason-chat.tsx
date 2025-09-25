@@ -127,6 +127,32 @@ function SlotRow({ label, value }: { label: string; value?: string }) {
   );
 }
 
+
+function Chip({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999, backgroundColor: ok ? "#DCFCE7" : "#F3F4F6", marginRight: 6, marginBottom: 6 }}>
+      <Text style={{ color: ok ? "#14532D" : "#374151", fontWeight: "600" }}>{ok ? "✓ " : "• "}{label}</Text>
+    </View>
+  );
+}
+
+function StatusChips({ slots }: { slots: any }) {
+  const hasRestaurant = !!slots?.restaurant;
+  const hasDetails = !!(slots?.placeId || slots?.destPhone || slots?.address);
+  const hasParty = !!slots?.partySize;
+  const hasDate = !!slots?.date;
+  const hasTime = !!slots?.time;
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 8 }}>
+      <Chip ok={hasRestaurant} label="Restaurant" />
+      <Chip ok={hasDetails} label="Place details" />
+      <Chip ok={hasParty} label="Party size" />
+      <Chip ok={hasDate} label="Date" />
+      <Chip ok={hasTime} label="Time" />
+    </View>
+  );
+}
+
 function SlotPanel({ slots }: { slots: any }) {
   const date = slots?.date;
   const time = slots?.time;
