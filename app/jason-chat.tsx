@@ -110,6 +110,50 @@ function applyAnnotations(baseSlots: Slots, annotations: Annotation[] | undefine
   return slots;
 }
 
+
+function formatPhone(s?: string) {
+  if (!s) return "";
+  const d = s.replace(/[^\d+]/g, "");
+  return d;
+}
+
+function SlotRow({ label, value }: { label: string; value?: string }) {
+  if (!value) return null;
+  return (
+    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 }}>
+      <Text style={{ color: "#374151" }}>{label}</Text>
+      <Text style={{ fontWeight: "600", color: "#111827" }}>{value}</Text>
+    </View>
+  );
+}
+
+function SlotPanel({ slots }: { slots: any }) {
+  const date = slots?.date;
+  const time = slots?.time;
+  const partySize = slots?.partySize ? String(slots.partySize) : "";
+  const phone = formatPhone(slots?.destPhone);
+  const userPhone = formatPhone(slots?.userPhone);
+  const addr = slots?.address || "";
+  const rest = slots?.restaurant || "";
+  const website = slots?.website || "";
+  const placeId = slots?.placeId || "";
+
+  return (
+    <View style={{ padding: 12, backgroundColor: "#F9FAFB", borderTopWidth: 1, borderColor: "#EEE", borderRadius: 10, marginBottom: 8 }}>
+      <Text style={{ fontWeight: "700", marginBottom: 8 }}>Reservation Details</Text>
+      <SlotRow label="Restaurant" value={rest} />
+      <SlotRow label="Address" value={addr} />
+      <SlotRow label="Phone" value={phone} />
+      <SlotRow label="Website" value={website} />
+      <SlotRow label="Place ID" value={placeId} />
+      <SlotRow label="Party Size" value={partySize} />
+      <SlotRow label="Date" value={date} />
+      <SlotRow label="Time" value={time} />
+      <SlotRow label="Your Phone" value={userPhone} />
+    </View>
+  );
+}
+
 export default function JasonChatScreen() {
   const router = useRouter();
   const [input, setInput] = useState("");
@@ -208,10 +252,7 @@ export default function JasonChatScreen() {
           </ScrollView>
 
           
-          <View style={{ padding: 8, backgroundColor: "#fafafa", borderTopWidth: 1, borderColor: "#eee" }}>
-            <Text style={{ fontWeight: "600", marginBottom: 4 }}>Slots (debug)</Text>
-            <Text selectable>{JSON.stringify(slots, null, 2)}</Text>
-          </View>
+          <SlotPanel slots={slots} />
 
           {/* <View style={{ padding: 8, backgroundColor: "#fafafa", borderTopWidth: 1, borderColor: "#eee" }}>
             <Text style={{ fontWeight: "600", marginBottom: 4 }}>Slots</Text>
