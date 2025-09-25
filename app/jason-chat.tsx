@@ -207,7 +207,12 @@ export default function JasonChatScreen() {
             )}
           </ScrollView>
 
-          {/* Slots debug (optional) */}
+          
+          <View style={{ padding: 8, backgroundColor: "#fafafa", borderTopWidth: 1, borderColor: "#eee" }}>
+            <Text style={{ fontWeight: "600", marginBottom: 4 }}>Slots (debug)</Text>
+            <Text selectable>{JSON.stringify(slots, null, 2)}</Text>
+          </View>
+
           {/* <View style={{ padding: 8, backgroundColor: "#fafafa", borderTopWidth: 1, borderColor: "#eee" }}>
             <Text style={{ fontWeight: "600", marginBottom: 4 }}>Slots</Text>
             <Text selectable>{JSON.stringify(slots, null, 2)}</Text>
