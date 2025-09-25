@@ -1,79 +1,70 @@
-// lib/jasonBrain.ts
+// app/lib/jasonBrain.ts
+// Client wrapper for the Jason Brain edge function (vNext contract).
+// Sends { threadId, requestId, messages, slots } and returns the server JSON as-is.
+// Reads Supabase anon key and functions base from Expo Constants if available.
+
 import Constants from "expo-constants";
 
-type Msg = { role: "user" | "assistant" | "tool"; content: string; name?: string; tool_call_id?: string };
-type Slots = Record<string, any>;
+type Role = "system" | "user" | "assistant" | "tool";
+export type Msg = { role: Role; content: string };
 
-const extra = (Constants.expoConfig?.extra ?? {}) as {
-  supabaseFunctionsBase?: string;
-  supabaseAnonKey?: string;
+export type JasonPayload = {
+  threadId: string;
+  requestId: string;
+  messages: Msg[];
+  slots?: Record<string, any>;
 };
 
-const FUNCTIONS_BASE =
-  extra.supabaseFunctionsBase ||
-  // fallback if you only provided supabaseUrl
-  (extra as any).supabaseUrl?.replace(".supabase.co", ".functions.supabase.co");
+export type JasonResponse = {
+  ok: boolean;
+  build?: string;
+  requestId?: string;
+  messagesDelta?: Msg[];
+  annotations?: any[];
+  slots?: Record<string, any>;
+  next_action?: any;
+  toolRequests?: any[];
+  error?: string;
+};
 
-const ANON = extra.supabaseAnonKey;
-
-if (!FUNCTIONS_BASE) {
-  console.warn("[jasonBrain] Missing functions base URL in expo.extra.supabaseFunctionsBase");
+function getConfig() {
+  const extra = (Constants?.expoConfig as any)?.extra || (Constants?.manifest as any)?.extra || {};
+  const functionsBase: string =
+    extra.functionsBase ||
+    // Fallback to your known project ref (update if needed):
+    "https://lkoogdveljyxwweranaf.functions.supabase.co";
+  const anon: string =
+    extra.supabaseAnon ||
+    // Fallback to your anon (from earlier setup):
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxrb29nZHZlbGp5eHd3ZXJhbmFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5NjQ1MDEsImV4cCI6MjA3MjU0MDUwMX0.gER6-spRheuIzCe_ET-ntaklbRQHkmGb75I3UJkFYKs";
+  return { functionsBase, anon };
 }
-if (!ANON) {
-  console.warn("[jasonBrain] Missing anon key in expo.extra.supabaseAnonKey");
-}
 
-export default async function callJasonBrain(
-  messages: Msg[],
-  slots?: Slots,
-  opts?: { dryRun?: boolean }
-): Promise<any> {
-  if (!Array.isArray(messages) || messages.length === 0) {
-    throw new Error("callJasonBrain: messages[] is required and must be non-empty");
-  }
-  const url = `${FUNCTIONS_BASE}/jason-brain`;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (ANON) {
-    headers["Authorization"] = `Bearer ${ANON}`;
-    headers["apikey"] = ANON;
-  }
-
-  // optional model-free sanity
-  if (opts?.dryRun) headers["x-dry-run"] = "1";
-
-  const body = {
-    messages,               // ✅ always messages[]
-    slots: slots ?? {},      // ✅ always an object
-  };
-
-  // tiny debug preview
-  try {
-    const preview = JSON.stringify({ url, hasAnon: !!ANON, msgCount: messages.length, slotKeys: Object.keys(slots ?? {}) });
-    console.log("[jasonBrain] ->", preview);
-  } catch {}
-
+export default async function callJasonBrain(payload: JasonPayload, opts?: { dryRun?: boolean }): Promise<JasonResponse> {
+  const { functionsBase, anon } = getConfig();
+  const url = `${functionsBase}/jason-brain`;
   const res = await fetch(url, {
     method: "POST",
-    headers,
-    body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${anon}`,
+      "apikey": anon,
+      ...(opts?.dryRun ? { "x-dry-run": "1" } : {}),
+    },
+    body: JSON.stringify(payload),
   });
 
-  let payload: any = null;
+  let data: any = null;
   try {
-    payload = await res.json();
-  } catch (e) {
-    throw new Error(`jason-brain parse error (${res.status}): ${String(e)}`);
+    data = await res.json();
+  } catch {
+    // ignore
   }
 
   if (!res.ok) {
-    // surface the server’s message
-    const msg = payload?.error || payload?.message || `HTTP ${res.status}`;
-    const detail = JSON.stringify(payload);
-    throw new Error(`jason-brain error: ${msg} :: ${detail}`);
+    const msg = data?.error || `HTTP ${res.status}`;
+    throw new Error(`jason-brain error: ${msg}`);
   }
 
-  return payload?.message ?? payload; // your server usually returns { ok, message, ... }
+  return data as JasonResponse;
 }
