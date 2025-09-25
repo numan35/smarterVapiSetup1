@@ -1,4 +1,76 @@
- string;
+// app/jason-chat.tsx
+import { useState, useRef } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  ScrollView,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import callJasonBrain from "@/lib/jasonBrain"; // ✅ default import (was named)
+import { callNow } from "@/services/callNow";
+import Constants from "expo-constants";
+
+
+// ---------- Debug helpers ----------
+function logToolCallsAnyShape(m: any, tag = "") {
+  try {
+    console.log(`<<< INSTRUMENTED ${tag}: after callJasonBrain >>>`);
+    try {
+      const preview = JSON.stringify(m)?.slice(0, 600);
+      console.log("📦 assistant preview:", preview);
+    } catch {}
+    const msgs = Array.isArray(m) ? m : (m?.message ? [m.message] : [m]).filter(Boolean);
+    const allCalls = msgs.flatMap((x: any) => x?.tool_calls ?? []);
+    const names = allCalls.map((c: any) => c?.function?.name ?? c?.name ?? "unknown");
+    console.log("🔧 Tool calls this turn:", names);
+    for (const c of allCalls) {
+      const nm = c?.function?.name ?? c?.name;
+      if (nm === "upsert_request_slots") {
+        console.log("🧩 upsert_request_slots args:", c?.function?.arguments ?? c?.arguments);
+      }
+    }
+  } catch (e) {
+    console.log("⚠️ logToolCallsAnyShape error:", e);
+  }
+}
+
+const { functionsBase, supabaseAnonKey } = (Constants.expoConfig?.extra ?? {}) as {
+  functionsBase?: string;
+  supabaseAnonKey?: string;
+};
+
+type Msg = { role: "user" | "assistant" | "tool"; content: string; name?: string; tool_call_id?: string };
+
+type SlotsState = {
+  kind?: "appliance" | "restaurant" | "tires" | "other";
+  mode?: "discovery" | "booking";
+  geoCenter?: { lat: number; lng: number } | null;
+  radiusMiles?: number;
+  desiredStart?: string | null;
+  desiredEnd?: string | null;
+  details?: {
+    address?: string;
+    website?: string;
+    placeId?: string;
+    city?: string;
+    distanceMi?: number;
+
+    restaurantName?: string;
+    partySize?: number;
+    date?: string;
+    timeWindowStart?: string;
+    timeWindowEnd?: string;
+    specialRequests?: string;
+
+    userPhone?: string;
+    restaurantPhone?: string;
+    targetPhone?: string;
     [k: string]: any;
   };
   ui?: { expectingDestPhone?: boolean };
@@ -380,11 +452,7 @@ await runTurn(
 
   const d = state.details ?? {};
   const friendlyDate = prettyDate(d.date);
-  const friendlyTime =
-  (d.timeWindowStart || d.timeWindowEnd)
-    ? prettyRange(d.timeWindowStart, d.timeWindowEnd)
-    : (d.time ?? "-");
-
+  const friendlyTime = prettyRange(d.timeWindowStart, d.timeWindowEnd);
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
