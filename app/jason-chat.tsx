@@ -6,7 +6,6 @@ import { callJasonBrain, JasonResponse } from "@/lib/jasonBrain";
 import { callNow } from "@/services/callNow";
 import Constants from "expo-constants";
 
-\1
 const REQUIRED = ["restaurant","city","date","time","party_size"];
 function readyToDial(slots: Record<string, any>) {
   return REQUIRED.every(k => slots && slots[k]);
