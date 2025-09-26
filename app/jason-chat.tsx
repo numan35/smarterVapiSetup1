@@ -1,15 +1,13 @@
-// app/jason-chat.tsx — robust error display
+// app/jason-chat.tsx — chat UI + toolRequests wiring
 import React, { useRef, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { callJasonBrain, JasonResponse } from "@/lib/jasonBrain";
 import { callNow } from "@/services/callNow";
-import Constants from "expo-constants";
 
-const REQUIRED = ["restaurant","city","date","time","party_size"];
-function readyToDial(slots: Record<string, any>) {
-  return REQUIRED.every(k => slots && slots[k]);
-}
+type Msg = { role: "user" | "assistant"; content: string };
+
+// --- Helpers to apply slot annotations coming from Jason ---
 function applyAnnotations(slots: Record<string, any>, anns?: any[]) {
   const next = { ...slots };
   (anns || []).forEach((a: any) => {
@@ -18,98 +16,129 @@ function applyAnnotations(slots: Record<string, any>, anns?: any[]) {
   return next;
 }
 
+const REQUIRED = ["restaurant","city","date","time","party_size"] as const;
+function hasRequired(slots: Record<string, any>) {
+  return REQUIRED.every(k => slots && slots[k] !== undefined && slots[k] !== null && String(slots[k]).trim() !== "");
+}
+
 export default function JasonChat() {
   const [messages, setMessages] = useState<Msg[]>([
     { role: "assistant", content: "Hi! I can help you make restaurant reservations. Tell me what you need." },
   ]);
   const [input, setInput] = useState("");
-  
-  const [hasDialed, setHasDialed] = useState(false);
-const [slots, setSlots] = useState<Record<string, any>>({});
   const [busy, setBusy] = useState(false);
-  const reqIdRef = useRef<string | null>(null);
+  const [slots, setSlots] = useState<Record<string, any>>({});
+  const [hasDialed, setHasDialed] = useState(false);
 
-  const send = async () => {
-    if (busy || !input.trim()) return;
-    setBusy(true);
-    const userMsg: Msg = { role: "user", content: input.trim() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-
-    const requestId = crypto.randomUUID();
-    reqIdRef.current = requestId;
-
-    let res: JasonResponse | null = null;
+  async function maybeDialFromToolOrSlots(res: JasonResponse) {
     try {
-      res = await callJasonBrain(
-        [...messages, userMsg],
-        slots,
-        { requestId }
+      // 1) Prefer explicit tool request from Jason
+      const toolReqs: any[] = Array.isArray(res?.toolRequests) ? res.toolRequests : [];
+      const callReq = toolReqs.find((t) => t && t.type === "call_now");
+
+      if (callReq && !hasDialed) {
+        console.log("☎️ ToolRequest: call_now", callReq);
+        const r = await callNow({
+          targetPhone: callReq.targetPhone || "+18623687383", // server redirect still applies
+          targetName: callReq.targetName || (slots.restaurant ?? "Restaurant"),
+          notes: callReq.notes || `City:${slots.city}; Date:${slots.date}; Time:${slots.time}; Party:${slots.party_size}`,
+        });
+        if (r?.ok) {
+          setHasDialed(true);
+          Alert.alert("Calling", "Jason is placing the call now.");
+        } else {
+          Alert.alert("Call failed", r?.error || "Unknown error");
+        }
+        return;
+      }
+
+      // 2) Fallback: if all required slots are present but no toolRequests
+      const merged = res?.slots || slots;
+      if (!hasDialed && hasRequired(merged)) {
+        console.log("☎️ Fallback dialing based on slots", merged);
+        const r = await callNow({
+          targetPhone: "+18623687383",
+          targetName: String(merged.restaurant || "Restaurant"),
+          notes: `City:${merged.city}; Date:${merged.date}; Time:${merged.time}; Party:${merged.party_size}`,
+        });
+        if (r?.ok) {
+          setHasDialed(true);
+          Alert.alert("Calling", "Jason is placing the call now.");
+        } else {
+          Alert.alert("Call failed", r?.error || "Unknown error");
+        }
+      }
+    } catch (e) {
+      console.warn("maybeDialFromToolOrSlots error", e);
+    }
+  }
+
+  async function send() {
+    if (!input.trim()) return;
+    const userMsg: Msg = { role: "user", content: input.trim() };
+    setMessages((m) => [...m, userMsg]);
+    setInput("");
+    setBusy(true);
+    try {
+      const res = await callJasonBrain(
+        messages.concat(userMsg).map((m) => ({ role: m.role, content: m.content })),
+        slots
       );
+      if (!res?.ok) {
+        setMessages((m) => [...m, { role: "assistant", content: res?.error || "Sorry, something went wrong." }]);
+        setBusy(false);
+        return;
+      }
+
+      // Apply slot annotations and update UI
+      const anns = res?.message?.annotations || res?.annotations || [];
+      const merged = applyAnnotations(slots, anns);
+      setSlots(merged);
+
+      // Append assistant message
+      const assistantText = res?.message?.content || "";
+      setMessages((m) => [...m, { role: "assistant", content: assistantText }]);
+
+      // Try to dial based on toolRequests or merged slots
+      await maybeDialFromToolOrSlots(res);
     } catch (e: any) {
-      // Hard exception (should be rare with safe wrapper)
-      setMessages((prev) => [...prev, { role: "assistant", content: `Jason error (exception): ${String(e?.message ?? e)}` }]);
+      setMessages((m) => [...m, { role: "assistant", content: `Error: ${e?.message || String(e)}` }]);
+    } finally {
       setBusy(false);
-      return;
     }
-
-    if (!res || res.ok === false) {
-      const err = res?.error || "Unknown error";
-      setMessages((prev) => [...prev, { role: "assistant", content: `Jason error: ${err}` }]);
-      setBusy(false);
-      return;
-    }
-
-    // Merge message(s)
-    let newAssistantMsgs: Msg[] = [];
-    if (res.messagesDelta && Array.isArray(res.messagesDelta)) {
-      newAssistantMsgs = res.messagesDelta
-        .filter((m: any) => m?.role === "assistant" && typeof m?.content === "string")
-        .map((m: any) => ({ role: "assistant", content: String(m.content) }));
-    } else if (res.message?.role === "assistant") {
-      newAssistantMsgs = [{ role: "assistant", content: String(res.message.content || "") }];
-    }
-    if (newAssistantMsgs.length === 0) {
-      newAssistantMsgs = [{ role: "assistant", content: "(no assistant content returned)" }];
-    }
-
-    const nextMessages = [...messages, userMsg, ...newAssistantMsgs];
-    setMessages(nextMessages);
-
-    // Apply annotations → slots (prefer canonical from server)
-    const nextSlots = applyAnnotations(slots, res.annotations);
-    setSlots(res.slots && typeof res.slots === "object" ? { ...nextSlots, ...res.slots } : nextSlots);
-
-    setBusy(false);
-  };
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
-          {messages.map((m, i) => (
-            <View key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", padding: 10, borderRadius: 10, backgroundColor: m.role === "user" ? "#DCF2FF" : "#f1f5f9" }}>
-              <Text>{m.content}</Text>
-            </View>
-          ))}
-          {busy && (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <ActivityIndicator />
-              <Text>Contacting Jason…</Text>
-            </View>
-          )}
-        </ScrollView>
-        <View style={{ borderTopWidth: 1, borderTopColor: "#e2e8f0", padding: 12 }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={{ flex: 1, padding: 16 }}>
+          <ScrollView style={{ flex: 1 }}>
+            {messages.map((m, i) => (
+              <View key={i} style={{ marginBottom: 12 }}>
+                <Text style={{ fontWeight: "700", color: m.role === "user" ? "#2563eb" : "#111827" }}>
+                  {m.role === "user" ? "You" : "Jason"}
+                </Text>
+                <Text>{m.content}</Text>
+              </View>
+            ))}
+          </ScrollView>
+
+          {busy && <ActivityIndicator style={{ marginBottom: 8 }} />}
+
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TextInput
-              style={{ flex: 1, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 }}
-              placeholder="Type your request…"
+              placeholder="Type your request..."
+              style={{ flex: 1, borderWidth: 1, padding: 12, borderRadius: 10 }}
               value={input}
               onChangeText={setInput}
               onSubmitEditing={send}
               returnKeyType="send"
             />
-            <TouchableOpacity onPress={send} disabled={busy || !input.trim()} style={{ backgroundColor: busy || !input.trim() ? "#cbd5e1" : "#2563eb", paddingHorizontal: 16, borderRadius: 10, justifyContent: "center" }}>
+            <TouchableOpacity
+              onPress={send}
+              disabled={busy || !input.trim()}
+              style={{ backgroundColor: busy ? "#9ca3af" : "#111827", paddingHorizontal: 16, borderRadius: 10, justifyContent: "center" }}
+            >
               <Text style={{ color: "white", fontWeight: "700" }}>Send</Text>
             </TouchableOpacity>
           </View>
