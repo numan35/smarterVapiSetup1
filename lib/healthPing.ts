@@ -14,7 +14,7 @@ function headersJson() {
 }
 
 // lib/healthPing.ts
-export async function pingFunction(path: string) {
+export async function pingFunction(path: string, init?: { method?: 'GET'|'POST', body?: any }) {
   const url = `${FUNCTIONS_BASE}/${path.replace(/^\//, "")}`;
   console.log("pingFunction URL:", url);
 
@@ -23,8 +23,9 @@ export async function pingFunction(path: string) {
 
   try {
     const res = await fetch(url, {
-      method: "GET",               // be explicit
-      headers: headersJson(),      // must include Authorization + apikey
+      method: init?.method ?? "GET",               // be explicit
+      headers: headersJson(),
+      body: init?.body ? JSON.stringify(init.body) : undefined,      // must include Authorization + apikey
       signal: ac.signal,
     });
 
