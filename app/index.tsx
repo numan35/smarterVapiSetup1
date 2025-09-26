@@ -83,6 +83,11 @@ export default function Home() {
       <Link href="/jason-chat" asChild>
         <Button title="Open Jason Chat" />
       </Link>
+
+      <View style={{ height: 8 }} />
+      <Link href="/diagnostics" asChild>
+        <Button title="Open Diagnostics" />
+      </Link>
     </View>
   );
 }
