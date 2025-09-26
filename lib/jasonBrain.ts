@@ -33,10 +33,13 @@ export async function callJasonBrain(
   opts: { requestId?: string; dryRun?: boolean } = {}
 ): Promise<JasonResponse> {
   if (!FUNCTIONS_BASE || !ANON) {
-    throw new Error("Jason config missing: supabaseFunctionsBase and/or supabaseAnonKey");
+    return { ok: false, error: "Jason config missing: supabaseFunctionsBase and/or supabaseAnonKey" } as any;
   }
   const url = `${FUNCTIONS_BASE}/jason-brain`;
-  const res = await fetch(url, {
+  // SAFE_FETCH_PATCH
+  let res: Response;
+  try {
+    res = await fetch(url, {
     method: "POST",
     headers: {
       ...headersJson(),
@@ -48,6 +51,9 @@ export async function callJasonBrain(
       slots,
     }),
   });
+  } catch (err: any) {
+    return { ok: false, error: String(err?.message ?? err) } as any;
+  }
   const text = await res.text();
   let json: JasonResponse;
   try {
