@@ -15,6 +15,7 @@ function headersJson() {
 
 export async function pingFunction(path: string): Promise<{ ok: boolean; status: number; json?: any; text?: string; }> {
   const url = `${FUNCTIONS_BASE}/${path.replace(/^\//, "")}`;
+  console.log("pingFunction URL:", url);
   const res = await fetch(url, { headers: headersJson() });
   const ct = res.headers.get("content-type") || "";
   let payload: any = undefined;
