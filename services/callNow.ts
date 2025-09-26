@@ -1,119 +1,58 @@
-
-
-console.log('[callNow] loaded from services/callNow.ts');
-
-
-// services/callNow.ts
+// services/callNow.ts — normalized config + consistent headers
 import Constants from "expo-constants";
 
-export type CallNowBody = {
-  // REQUIRED
-  targetPhone: string; // E.164 (+14045551234)
-
-  // Server-expected fields
-  targetName?: string | null;
-  time?: string | null;        // "HH:mm" or ISO time
-  phoneE164?: string | null;
-
-  // Your existing fields (kept for convenience)
-  businessName?: string | null;
-  customerName?: string | null;
-
-  partySize?: number | null;
-  date?: string | null;               // "YYYY-MM-DD" (or ISO)
-  desiredWindowStart?: string | null; // optional window (ISO)
-  desiredWindowEnd?: string | null;
-
-  notes?: string | null;
-  source?: "app" | "admin" | string;
-  requestId?: string | null;
-  targetId?: string | null;
-  script?: string | null;
+type CallNowArgs = {
+  targetPhone: string;
+  targetName?: string;
+  notes?: string;
+  scheduledForIso?: string; // optional ISO datetime
 };
 
-type CallNowResponse =
-  | { ok: true; callId: string | null; vapiId?: string | null }
-  | { ok: false; error: string; status?: number; details?: any };
+type CallNowResult =
+  | { ok: true; callId: string; vapiId?: string | null }
+  | { ok: false; error: string };
 
-// Normalize to E.164 (US default if 10 digits)
-function toE164Maybe(s: string): string {
-  const raw = (s || "").trim();
-  if (/^\+\d{10,15}$/.test(raw)) return raw;
-  const d = raw.replace(/\D/g, "");
-  if (!d) return raw;
-  if (d.length === 10) return `+1${d}`;
-  return d.startsWith("+") ? d : `+${d}`;
-}
+const extra: any = Constants.expoConfig?.extra ?? {};
+const FUNCTIONS_BASE: string = extra.supabaseFunctionsBase;
+const ANON: string = extra.supabaseAnonKey;
+const DEV_TOKEN: string | undefined = extra.devToken;
 
-export async function callNow(args: CallNowBody): Promise<CallNowResponse> {
-  const extra = (Constants.expoConfig?.extra ?? {}) as any;
-
-  const base =
-    extra.supabaseFunctionsBase ??
-    `https://${String(extra?.supabaseUrl || "")
-      .replace(/^https?:\/\//, "")
-      .split(".supabase.co")[0]}.functions.supabase.co`;
-
-  const url = `${base}/call-now`;
-
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (extra?.supabaseAnonKey) {
-    headers.Authorization = `Bearer ${extra.supabaseAnonKey}`;
-    headers.apikey = extra.supabaseAnonKey;
-  }
-  if (extra?.devToken) headers["x-dev-token"] = String(extra.devToken);
-
-  // ---- Map BOTH old and new shapes to what the server expects ----
-  const targetName =
-    args.targetName ?? args.businessName ?? null;
-
-  const time =
-    args.time ?? args.desiredWindowStart ?? null;
-
-  const phoneE164 =
-    args.phoneE164 ?? null;
-
-  const body = {
-    // required
-    targetPhone: toE164Maybe(args.targetPhone),
-
-    // expected by server
-    targetName,
-    time,
-    phoneE164,
-
-    // useful context (server may ignore unknowns)
-    partySize: args.partySize ?? null,
-    date: args.date ?? null,
-    desiredWindowStart: args.desiredWindowStart ?? null,
-    desiredWindowEnd: args.desiredWindowEnd ?? null,
-    notes: args.notes ?? null,
-    source: args.source ?? "app",
-    requestId: args.requestId ?? null,
-    targetId: args.targetId ?? null,
-    script: args.script ?? null,
-
-    // optional niceties
-    businessName: args.businessName ?? null,
-    customerName: args.customerName ?? null,
+function headersJson() {
+  const h: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${ANON}`,
+    apikey: ANON,
   };
-  
-console.log("[callNow] POST", url);
-
-  try {
-    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
-    const text = await res.text();
-    let json: any = {};
-    try { json = JSON.parse(text); } catch { json = { raw: text }; }
-
-    if (!res.ok) {
-      return { ok: false, error: json?.error ?? res.statusText ?? `HTTP ${res.status}`, status: res.status, details: json?.details ?? json?.raw };
-    }
-
-    return { ok: true, callId: json?.callId ?? json?.call?.id ?? null, vapiId: json?.vapiId ?? null };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? "Network error" };
-  }
+  if (DEV_TOKEN) h["x-dev-token"] = DEV_TOKEN;
+  return h;
 }
 
-export default callNow;
+export async function callNow(args: CallNowArgs): Promise<CallNowResult> {
+  if (!FUNCTIONS_BASE || !ANON) {
+    return { ok: false, error: "Missing supabaseFunctionsBase or supabaseAnonKey in app config" };
+  }
+  const url = `${FUNCTIONS_BASE}/call-now`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: headersJson(),
+      body: JSON.stringify({
+        targetPhone: args.targetPhone,
+        targetName: args.targetName,
+        notes: args.notes,
+        scheduledForIso: args.scheduledForIso,
+      }),
+    });
+    const text = await res.text();
+    let json: any;
+    try { json = JSON.parse(text); } catch {
+      return { ok: false, error: `Bad JSON from call-now (${res.status})` };
+    }
+    if (!res.ok || !json?.ok) {
+      return { ok: false, error: json?.error || `call-now ${res.status}` };
+    }
+    return { ok: true, callId: json.callId, vapiId: json.vapiId ?? null };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
