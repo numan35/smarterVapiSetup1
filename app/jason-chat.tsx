@@ -227,7 +227,11 @@ export default function JasonChatScreen() {
         newAssistantMsgs = [{ role: "assistant", content: String(res.message.content || "") }];
       }
 
-      const nextMessages = [...historyBefore, ...newAssistantMsgs];
+      
+      if (res && res.ok === false && res.error) {
+        setMessages((prev) => [...prev, { role: "assistant", content: `Jason error: ${String(res.error)}` }]);
+      }
+const nextMessages = [...historyBefore, ...newAssistantMsgs];
       setMessages(nextMessages);
 
       // 5) Apply annotations → slots
@@ -240,6 +244,8 @@ export default function JasonChatScreen() {
       // Confirmation is a separate UX path; we only render assistant text here.
 
     } catch (e: any) {
+      /* SNAG_ERROR_SURFACE */
+      const msg = (e?.message || e) ? `Jason error: ${String(e?.message ?? e)}` : "Jason failed";
       setMessages((prev) => [...prev, { role: "assistant", content: "Sorry, I hit a snag talking to Jason Brain. Try again." }]);
       console.error("Jason send error:", e);
     } finally {
