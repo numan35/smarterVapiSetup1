@@ -1,4 +1,4 @@
-// app/jason-chat.tsx — chat UI + toolRequests wiring
+// app/jason-chat.tsx — chat UI + toolRequests wiring + visible debug panel
 import React, { useRef, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,7 +7,6 @@ import { callNow } from "@/services/callNow";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-// --- Helpers to apply slot annotations coming from Jason ---
 function applyAnnotations(slots: Record<string, any>, anns?: any[]) {
   const next = { ...slots };
   (anns || []).forEach((a: any) => {
@@ -29,19 +28,21 @@ export default function JasonChat() {
   const [busy, setBusy] = useState(false);
   const [slots, setSlots] = useState<Record<string, any>>({});
   const [hasDialed, setHasDialed] = useState(false);
+  const [lastTool, setLastTool] = useState<any>(null);
 
-  async function maybeDialFromToolOrSlots(res: JasonResponse) {
+  async function maybeDialFromToolOrSlots(res: JasonResponse, mergedSlots: Record<string, any>) {
     try {
-      // 1) Prefer explicit tool request from Jason
       const toolReqs: any[] = Array.isArray(res?.toolRequests) ? res.toolRequests : [];
       const callReq = toolReqs.find((t) => t && t.type === "call_now");
+      setLastTool(callReq || null);
 
       if (callReq && !hasDialed) {
         console.log("☎️ ToolRequest: call_now", callReq);
+        Alert.alert("ToolRequest detected", JSON.stringify(callReq, null, 2));
         const r = await callNow({
-          targetPhone: callReq.targetPhone || "+18623687383", // server redirect still applies
-          targetName: callReq.targetName || (slots.restaurant ?? "Restaurant"),
-          notes: callReq.notes || `City:${slots.city}; Date:${slots.date}; Time:${slots.time}; Party:${slots.party_size}`,
+          targetPhone: callReq.targetPhone || "+18623687383",
+          targetName: callReq.targetName || (mergedSlots.restaurant ?? "Restaurant"),
+          notes: callReq.notes || `City:${mergedSlots.city}; Date:${mergedSlots.date}; Time:${mergedSlots.time}; Party:${mergedSlots.party_size}`,
         });
         if (r?.ok) {
           setHasDialed(true);
@@ -52,14 +53,13 @@ export default function JasonChat() {
         return;
       }
 
-      // 2) Fallback: if all required slots are present but no toolRequests
-      const merged = res?.slots || slots;
-      if (!hasDialed && hasRequired(merged)) {
-        console.log("☎️ Fallback dialing based on slots", merged);
+      if (!hasDialed && hasRequired(mergedSlots)) {
+        console.log("☎️ Fallback dialing based on slots", mergedSlots);
+        Alert.alert("Slots complete", "Dialing based on slots.");
         const r = await callNow({
           targetPhone: "+18623687383",
-          targetName: String(merged.restaurant || "Restaurant"),
-          notes: `City:${merged.city}; Date:${merged.date}; Time:${merged.time}; Party:${merged.party_size}`,
+          targetName: String(mergedSlots.restaurant || "Restaurant"),
+          notes: `City:${mergedSlots.city}; Date:${mergedSlots.date}; Time:${mergedSlots.time}; Party:${mergedSlots.party_size}`,
         });
         if (r?.ok) {
           setHasDialed(true);
@@ -70,6 +70,7 @@ export default function JasonChat() {
       }
     } catch (e) {
       console.warn("maybeDialFromToolOrSlots error", e);
+      Alert.alert("Error", String(e));
     }
   }
 
@@ -90,17 +91,17 @@ export default function JasonChat() {
         return;
       }
 
-      // Apply slot annotations and update UI
       const anns = res?.message?.annotations || res?.annotations || [];
       const merged = applyAnnotations(slots, anns);
       setSlots(merged);
 
-      // Append assistant message
       const assistantText = res?.message?.content || "";
       setMessages((m) => [...m, { role: "assistant", content: assistantText }]);
 
-      // Try to dial based on toolRequests or merged slots
-      await maybeDialFromToolOrSlots(res);
+      console.log("🔍 toolRequests:", res?.toolRequests);
+      console.log("🔍 merged slots:", merged);
+
+      await maybeDialFromToolOrSlots(res, merged);
     } catch (e: any) {
       setMessages((m) => [...m, { role: "assistant", content: `Error: ${e?.message || String(e)}` }]);
     } finally {
@@ -108,10 +109,34 @@ export default function JasonChat() {
     }
   }
 
+  // Visible debug panel
+  const debugJson = JSON.stringify({ slots, hasDialed, lastTool }, null, 2);
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={{ flex: 1, padding: 16 }}>
+          {/* Debug Box */}
+          <View style={{ backgroundColor: "#f3f4f6", borderRadius: 8, padding: 8, marginBottom: 8 }}>
+            <Text style={{ fontWeight: "700", marginBottom: 4 }}>Debug</Text>
+            <Text selectable>{debugJson}</Text>
+            <View style={{ height: 8 }} />
+            <TouchableOpacity
+              onPress={async () => {
+                Alert.alert("Force Call", "Attempting callNow()");
+                const r = await callNow({
+                  targetPhone: "+18623687383",
+                  targetName: String(slots.restaurant || "Restaurant"),
+                  notes: `City:${slots.city}; Date:${slots.date}; Time:${slots.time}; Party:${slots.party_size}`,
+                });
+                Alert.alert("Force Call result", r?.ok ? `OK (callId ${r.callId})` : (r?.error || "Unknown error"));
+              }}
+              style={{ backgroundColor: "#111827", padding: 10, borderRadius: 8, alignSelf: "flex-start" }}
+            >
+              <Text style={{ color: "white", fontWeight: "700" }}>Force Call Now</Text>
+            </TouchableOpacity>
+          </View>
+
           <ScrollView style={{ flex: 1 }}>
             {messages.map((m, i) => (
               <View key={i} style={{ marginBottom: 12 }}>
