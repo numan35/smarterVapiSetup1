@@ -15,8 +15,12 @@ export default function Diagnostics() {
   const run = async () => {
     const results: any[] = [];
     for (const t of tests) {
-      const r = await pingFunction(t.path);
-      results.push({ name: t.name, ...r });
+      try {
+        const r = await pingFunction(t.path, { method: (t as any).method, body: (t as any).body });
+        results.push({ name: t.name, status: 200, ok: true, json: r });
+      } catch (e: any) {
+        results.push({ name: t.name, status: "ERR", ok: false, text: String(e?.message || e) });
+      }
     }
     setOut(results);
   };
