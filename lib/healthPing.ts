@@ -13,16 +13,36 @@ function headersJson() {
   };
 }
 
-export async function pingFunction(path: string): Promise<{ ok: boolean; status: number; json?: any; text?: string; }> {
+// lib/healthPing.ts
+export async function pingFunction(path: string) {
   const url = `${FUNCTIONS_BASE}/${path.replace(/^\//, "")}`;
   console.log("pingFunction URL:", url);
-  const res = await fetch(url, { headers: headersJson() });
-  const ct = res.headers.get("content-type") || "";
-  let payload: any = undefined;
-  if (ct.includes("application/json")) {
-    try { payload = await res.json(); } catch { /* noop */ }
-  } else {
-    try { payload = await res.text(); } catch { /* noop */ }
+
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 8000);
+
+  try {
+    const res = await fetch(url, {
+      method: "GET",               // be explicit
+      headers: headersJson(),      // must include Authorization + apikey
+      signal: ac.signal,
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} ${res.statusText} — ${body.slice(0, 300)}`);
+    }
+
+    const ct = res.headers.get("content-type") || "";
+    return ct.includes("application/json") ? await res.json() : await res.text();
+  } catch (err: any) {
+    // Surface CORS/network vs abort distinctly
+    if (err.name === "AbortError") {
+      throw new Error("Ping timed out after 8s");
+    }
+    // TypeError often = CORS or network
+    throw new Error(`Ping failed: ${err?.message || String(err)}`);
+  } finally {
+    clearTimeout(t);
   }
-  return { ok: res.ok, status: res.status, json: typeof payload === "object" ? payload : undefined, text: typeof payload === "string" ? payload : undefined };
 }
