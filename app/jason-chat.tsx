@@ -3,10 +3,14 @@ import React, { useRef, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { callJasonBrain, JasonResponse } from "@/lib/jasonBrain";
+import { callNow } from "@/services/callNow";
 import Constants from "expo-constants";
 
-type Msg = { role: "user" | "assistant"; content: string };
-
+\1
+const REQUIRED = ["restaurant","city","date","time","party_size"];
+function readyToDial(slots: Record<string, any>) {
+  return REQUIRED.every(k => slots && slots[k]);
+}
 function applyAnnotations(slots: Record<string, any>, anns?: any[]) {
   const next = { ...slots };
   (anns || []).forEach((a: any) => {
@@ -20,7 +24,9 @@ export default function JasonChat() {
     { role: "assistant", content: "Hi! I can help you make restaurant reservations. Tell me what you need." },
   ]);
   const [input, setInput] = useState("");
-  const [slots, setSlots] = useState<Record<string, any>>({});
+  
+  const [hasDialed, setHasDialed] = useState(false);
+const [slots, setSlots] = useState<Record<string, any>>({});
   const [busy, setBusy] = useState(false);
   const reqIdRef = useRef<string | null>(null);
 
