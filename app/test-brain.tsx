@@ -1,8 +1,8 @@
 // app/test-brain.tsx — minimal test screen for jason-brain
 import React, { useState } from "react";
 import { View, Text, TextInput, Button, ScrollView } from "react-native";
-import { callJasonBrain } from "./lib/jasonBrain";
-import { assertConfig } from "./lib/configGuard";
+import { callJasonBrain } from "@/lib/jasonBrain";
+import { assertConfig } from "@/lib/configGuard";
 
 export default function TestBrain() {
   assertConfig();
