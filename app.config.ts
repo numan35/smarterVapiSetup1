@@ -14,6 +14,6 @@ export default ({ config }: ConfigContext) => ({
     supabaseFunctionsBase: "https://lkoogdveljyxwweranaf.functions.supabase.co",
 
     // Optional local dev helper for call-now (only if CALL_NOW_TEST_TOKEN is set server-side)
-    devToken: ""
+    devToken: "something-unguessable-123"
   }
 });
