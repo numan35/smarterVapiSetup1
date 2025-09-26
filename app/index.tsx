@@ -4,6 +4,7 @@ import { View, Text, TextInput, Button, ActivityIndicator, Alert } from 'react-n
 import { useRouter, Link } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { callNow } from '@/services/callNow';
+import { Link } from 'expo-router';
 
 export default function Home() {
   const router = useRouter();
