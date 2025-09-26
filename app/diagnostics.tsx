@@ -1,7 +1,7 @@
 // app/diagnostics.tsx — quick sanity pings for your functions
 import React, { useState } from "react";
 import { View, Text, Button, ScrollView } from "react-native";
-import { pingFunction } from "@/lib/healthPing";
+import { pingFunction } from "../lib/healthPing";
 import { assertConfig } from "@/lib/configGuard";
 
 export default function Diagnostics() {
