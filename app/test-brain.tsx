@@ -1,81 +1,55 @@
-// app/test-brain.tsx
-import { useState } from "react";
-import { View, Text, Button, ScrollView } from "react-native";
-import callJasonBrain from "@/lib/jasonBrain";
-
-type Msg = { role: "user" | "assistant" | "tool"; content: string };
-
-function extractSlots(payload: any) {
-  const out: Record<string, any> = {};
-  const anns = payload?.message?.annotations ?? [];
-  for (const a of anns) if (a?.type === "slot_set" && a.key) out[a.key] = a.value;
-  return out;
-}
+// app/test-brain.tsx — minimal test screen for jason-brain
+import React, { useState } from "react";
+import { View, Text, TextInput, Button, ScrollView } from "react-native";
+import { callJasonBrain } from "./lib/jasonBrain";
+import { assertConfig } from "./lib/configGuard";
 
 export default function TestBrain() {
+  assertConfig();
+  const [input, setInput] = useState("Book Via Carota in New York for 2 tomorrow at 7pm. My phone +1 212 555 1234");
+  const [log, setLog] = useState<any>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [payload, setPayload] = useState<any>(null);
-  const [slots, setSlots] = useState<Record<string, any>>({});
 
-  async function run(messages: Msg[], seedSlots: Record<string, any> = {}) {
+  const onSend = async () => {
+    setBusy(true);
     try {
-      setBusy(true);
-      setError(null);
-      const p = await callJasonBrain(messages, seedSlots);
-      setPayload(p);
-      setSlots(extractSlots(p));
-      console.log("brain payload:", p);
+      const resp = await callJasonBrain([{ role: "user", content: input }], {}, { dryRun: true });
+      setLog(resp);
     } catch (e: any) {
-      setError(e?.message || String(e));
-      console.log("brain error:", e);
+      setLog({ ok: false, error: e?.message || String(e) });
     } finally {
       setBusy(false);
     }
-  }
+  };
+
+  const anns = log?.annotations ?? log?.message?.annotations ?? [];
+  const slots = log?.slots ?? {};
 
   return (
-    <View style={{ flex: 1, padding: 16, gap: 12 }}>
-      <Text style={{ fontSize: 18, fontWeight: "700" }}>Jason Brain Test</Text>
-
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <Button
-          title={busy ? "Running…" : "Opinion"}
-          disabled={busy}
-          onPress={() => run([{ role: "user", content: "I’m in New York. Any cozy Italian spots you recommend?" }], { city: "New York" })}
-        />
-        <Button
-          title={busy ? "Running…" : "Book Via Carota"}
-          disabled={busy}
-          onPress={() =>
-            run([{ role: "user", content: "Book Via Carota for 2 tomorrow at 19:00. My phone is +1 212 555 1234." }], { city: "New York" })
+    <ScrollView style={{ padding: 16 }}>
+      <Text style={{ fontSize: 22, fontWeight: "700", marginBottom: 8 }}>Test Jason Brain</Text>
+      <TextInput
+        value={input}
+        onChangeText={setInput}
+        placeholder="Type a booking request…"
+        style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 8, marginBottom: 12 }}
+        multiline
+      />
+      <Button title={busy ? "Sending…" : "Send (dry-run)"} onPress={onSend} disabled={busy} />
+      {log && (
+        <View style={{ marginTop: 16 }}>
+          <Text style={{ fontSize: 18, fontWeight: "600" }}>Response</Text>
+          <Text selectable style={{ fontFamily: "monospace" }}>{JSON.stringify(log, null, 2)}</Text>
+          <Text style={{ fontSize: 18, fontWeight: "600", marginTop: 12 }}>Annotations</Text>
+          {anns.length === 0 ? <Text>— none —</Text> : anns.map((a: any, i: number) => (
+            <Text key={i}>• {a.type} {a.key ? `(${a.key})` : ""}: {a.value ?? ""}</Text>
+          ))}
+          <Text style={{ fontSize: 18, fontWeight: "600", marginTop: 12 }}>Slots</Text>
+          {Object.keys(slots).length === 0 ? <Text>— none —</Text> :
+            Object.entries(slots).map(([k, v]: any, i: number) => <Text key={i}>• {k}: {String(v)}</Text>)
           }
-        />
-        <Button
-          title={busy ? "Running…" : "Dry-run check"}
-          disabled={busy}
-          onPress={() => run([{ role: "user", content: "ping" }], { city: "New York" })}
-        />
-      </View>
-
-      {error ? <Text style={{ color: "red" }}>Error: {error}</Text> : null}
-
-      <Text style={{ marginTop: 8, fontWeight: "600" }}>Assistant</Text>
-      <ScrollView style={{ maxHeight: 120, padding: 8, borderWidth: 1, borderColor: "#ddd", borderRadius: 8 }}>
-        <Text>
-          {payload?.message?.content ?? "(press one of the buttons above)"}
-        </Text>
-      </ScrollView>
-
-      <Text style={{ marginTop: 8, fontWeight: "600" }}>Slots</Text>
-      <ScrollView style={{ maxHeight: 120, padding: 8, borderWidth: 1, borderColor: "#ddd", borderRadius: 8 }}>
-        <Text selectable>{JSON.stringify(slots, null, 2)}</Text>
-      </ScrollView>
-
-      <Text style={{ marginTop: 8, fontWeight: "600" }}>Raw (preview)</Text>
-      <ScrollView style={{ flex: 1, padding: 8, borderWidth: 1, borderColor: "#ddd", borderRadius: 8 }}>
-        <Text selectable>{JSON.stringify(payload, null, 2)}</Text>
-      </ScrollView>
-    </View>
+        </View>
+      )}
+    </ScrollView>
   );
 }
