@@ -1,70 +1,64 @@
-// app/lib/jasonBrain.ts
-// Client wrapper for the Jason Brain edge function (vNext contract).
-// Sends { threadId, requestId, messages, slots } and returns the server JSON as-is.
-// Reads Supabase anon key and functions base from Expo Constants if available.
-
+// lib/jasonBrain.ts — client wrapper for the jason-brain function
 import Constants from "expo-constants";
 
-type Role = "system" | "user" | "assistant" | "tool";
-export type Msg = { role: Role; content: string };
-
-export type JasonPayload = {
-  threadId: string;
-  requestId: string;
-  messages: Msg[];
-  slots?: Record<string, any>;
-};
-
-export type JasonResponse = {
+type ChatMessage = { role: "user" | "assistant" | "system" | "tool"; content: string; name?: string };
+type JasonResponse = {
   ok: boolean;
   build?: string;
   requestId?: string;
-  messagesDelta?: Msg[];
+  message?: { role: string; content?: string; annotations?: any[] } | null;
+  messagesDelta?: any[];
   annotations?: any[];
   slots?: Record<string, any>;
-  next_action?: any;
+  next_action?: string | null;
   toolRequests?: any[];
   error?: string;
 };
 
-function getConfig() {
-  const extra = (Constants?.expoConfig as any)?.extra || (Constants?.manifest as any)?.extra || {};
-  const functionsBase: string =
-    extra.functionsBase ||
-    // Fallback to your known project ref (update if needed):
-    "https://lkoogdveljyxwweranaf.functions.supabase.co";
-  const anon: string =
-    extra.supabaseAnon ||
-    // Fallback to your anon (from earlier setup):
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxrb29nZHZlbGp5eHd3ZXJhbmFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5NjQ1MDEsImV4cCI6MjA3MjU0MDUwMX0.gER6-spRheuIzCe_ET-ntaklbRQHkmGb75I3UJkFYKs";
-  return { functionsBase, anon };
+const extra: any = Constants.expoConfig?.extra ?? {};
+const FUNCTIONS_BASE: string = extra.supabaseFunctionsBase || extra.functionsBase || "";
+const ANON: string = extra.supabaseAnonKey || extra.supabaseAnon || "";
+
+function headersJson() {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${ANON}`,
+    apikey: ANON,
+  };
 }
 
-export default async function callJasonBrain(payload: JasonPayload, opts?: { dryRun?: boolean }): Promise<JasonResponse> {
-  const { functionsBase, anon } = getConfig();
-  const url = `${functionsBase}/jason-brain`;
+export async function callJasonBrain(
+  messages: ChatMessage[],
+  slots: Record<string, any> = {},
+  opts: { requestId?: string; dryRun?: boolean } = {}
+): Promise<JasonResponse> {
+  if (!FUNCTIONS_BASE || !ANON) {
+    throw new Error("Jason config missing: supabaseFunctionsBase and/or supabaseAnonKey");
+  }
+  const url = `${FUNCTIONS_BASE}/jason-brain`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${anon}`,
-      "apikey": anon,
-      ...(opts?.dryRun ? { "x-dry-run": "1" } : {}),
+      ...headersJson(),
+      ...(opts.dryRun ? { "x-dry-run": "1" } : null),
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      requestId: opts.requestId,
+      messages,
+      slots,
+    }),
   });
-
-  let data: any = null;
+  const text = await res.text();
+  let json: JasonResponse;
   try {
-    data = await res.json();
+    json = JSON.parse(text);
   } catch {
-    // ignore
+    return { ok: false, error: `Bad JSON from jason-brain (${res.status})` };
   }
 
-  if (!res.ok) {
-    const msg = data?.error || `HTTP ${res.status}`;
-    throw new Error(`jason-brain error: ${msg}`);
+  // Back-compat: mirror top-level annotations into message.annotations if missing
+  if (json?.message && !json.message.annotations && json.annotations) {
+    json.message.annotations = json.annotations;
   }
-
-  return data as JasonResponse;
+  return json;
 }
