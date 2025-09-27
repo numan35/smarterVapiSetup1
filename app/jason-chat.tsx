@@ -20,6 +20,28 @@ function hasRequired(slots: Record<string, any>) {
   return REQUIRED.every(k => slots && slots[k] !== undefined && slots[k] !== null && String(slots[k]).trim() !== "");
 }
 
+async function pingJason() {
+  const BASE = "https://lkoogdveljyxwweranaf.functions.supabase.co";
+  const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxrb29nZHZlbGp5eHd3ZXJhbmFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5NjQ1MDEsImV4cCI6MjA3MjU0MDUwMX0.gER6-spRheuIzCe_ET-ntaklbRQHkmGb75I3UJkFYKs";
+
+  try {
+    const r = await fetch(`${BASE}/jason-brain`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${ANON}`,
+        apikey: ANON,
+        // React Native does NOT auto-set Origin; if your function checks it, set it:
+        Origin: "http://localhost:19006",
+      },
+    });
+    const text = await r.text();
+    console.log("PING status", r.status, "body:", text);
+  } catch (e: any) {
+    console.log("PING error", e?.message ?? e);
+  }
+}
+
+
 export default function JasonChat() {
   const [messages, setMessages] = useState<Msg[]>([
     { role: "assistant", content: "Hi! I can help you make restaurant reservations. Tell me what you need." },
